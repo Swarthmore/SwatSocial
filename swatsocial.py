@@ -26,6 +26,7 @@ import re
 import ConfigParser
 import datetime
 from tornado.options import define, options
+from tornado.template import Template, Loader
 from instagram.client import InstagramAPI
 
 
@@ -37,7 +38,7 @@ Config.read("swatsocial.conf")
 
 ### Tornado Configuration ###
 define("port", default=Config.get('app', "port"), help="run on the given port", type=int)
-
+debug_mode = Config.get('app', "debug_mode")
 
 
 ### Arduino Configuration ###
@@ -55,15 +56,19 @@ twitter_configuration = {
 	"twitter_access_token": Config.get('Twitter', "twitter_access_token")	
 }
 
-twitter_tracking_terms = []
+twitter_tracking_terms = ""
 twitter_search_terms = {}
-
+twitter_definition_refresh = Config.getint('Twitter', "twitter_definition_refresh")
 
 
 ### Instagram Configuration ###
 instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"))
 instagram_last_location_id = 0
 instagram_last_tag_id = 0
+instagram_check_time = Config.getint('Instagram', "instagram_check_time")
+
+
+
 
 
 
@@ -93,21 +98,41 @@ def check_instagram():
 	global instagram_last_location_id
 	global instagram_last_tag_id
 
-	print "Searching for instagram"
-	image_list = ""
+	update_status("Searching for instagram.  Last location id is %s" % instagram_last_location_id, 1)
+	image_list= ""
 	
-	
-	
+	# 45845732 is Swarthmore College
 	# Note: "39556451" is the id for the Swarthmore location
-	ig_media, next =  instagram_api.location_recent_media(100, 99999999999999999999999, 39556451)
+	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
+
 
 	# Grab any new pictures
 	for media in ig_media:
 		if media.id > instagram_last_location_id:
-			caption = media.user.username
+			# This is a new picture -- post it
+			update_status("Found a new Instragram post by %s" % media.user.username)
+			message = {	"id": media.id,
+						"thumbnail_url": media.images['thumbnail'].url,
+						"timestamp": datetime.datetime.now().strftime("%m/%d/%Y %H:%M:%S"),
+						"name": media.user.username,
+						"caption": ""
+					}
+	
+			# Some media doesn't have a caption.  If it does -- include it		
 			if hasattr(media.caption, 'text'): 
-				caption +=  ": "  + media.caption.text
-			image_list +=  "<div class='message'><img style='align: left;vertical-align:text-top;margin:5px' src='" + media.images['thumbnail'].url + "'>" + caption + "</div>"
+				message["caption"] = media.caption.text
+
+			# Send media to template and post it
+			loader = Loader("./templates")
+			message["html"] = loader.load("instagram_message.html").generate(message=message)
+
+			# Send the Instagram info to all the clients
+			for waiter in ChatSocketHandler.waiters:
+				try:
+					waiter.write_message(message)	
+				except:
+					logging.error("Error sending Instrgram message", exc_info=True)
+
 				
 	# Find the highest id and save it
 	for media in ig_media:
@@ -115,12 +140,14 @@ def check_instagram():
 			instagram_last_location_id = media.id
 			
 	
-	
-	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999, "swarthmore")
+
+	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999999999, "swarthmore")
 	# Grab any new pictures
 	for media in ig_media:
 		if media.id > instagram_last_tag_id:
-			image_list +=  "<div class='message' style='font-size:50%'><img style='align: left;vertical-align:text-top;' src='" + media.images['thumbnail'].url + "'>" + media.user.username + ": " + media.caption.text + "</div>"
+			x =   "%s" % (media.filter)
+			
+			image_list +=  "<div class='message'><img style='align: left;vertical-align:text-top;margin:5px' src='" + media.images['thumbnail'].url + "'>" + media.user.username + ": " + media.caption.text + "(" + x + ")</div>"
 				 
 
 	# Find the highest id and save it
@@ -237,7 +264,7 @@ def TwitterListener(message):
 				color1 = value["color1"]
 				color2 = value["color2"]
 				display_mode = value["mode"]
-				id = message["id"]
+				id = message["id"] 
 				break
 	
 	if display_mode < 0:
@@ -245,7 +272,7 @@ def TwitterListener(message):
 		# Display a generic code
 		print "Couldn't find a search term to match with -- using default colors"
 		color1 = "FF00FF"
-		color2 = "00FF00"
+		color2 = "00FF00" 
 		display_mode = 1
 	
 	logging.info("Display mode %d", display_mode)
@@ -253,11 +280,22 @@ def TwitterListener(message):
 	logging.info("sending message to %d waiters", len(ChatSocketHandler.waiters))
 	
 	# Hyperlink URLs
-	tweet = {"body": fix_urls(message["text"]), "id" : message["id_str"], "color1": color1, "color2": color2}  			
-	tweet["html"] = '<div class="message" id="' + tweet["id"] + '"><span style="background-color:#' +color1 + '"><b>' + message["user"]["screen_name"] + '</b></span>&nbsp;&nbsp' + tweet["body"] + '<BR><div style="width:100%;font-size:50%;text-align:right">' + datetime.datetime.now().strftime("%m/%d/%Y %H:%M:%S") + '</div>'
+	tweet = {	"text": fix_urls(message["text"]), 
+				"id" : message["id_str"], 
+				"color1": color1, 
+				"color2": color2,
+				"name": message["user"]["screen_name"],
+				"source": message["source"],  
+				"length": len(message["text"]),
+				"timestamp": datetime.datetime.now().strftime("%m/%d/%Y %H:%M:%S"),
+				"profile_image_url": message["user"]["profile_image_url"]
+			 }  			
+	
 
+	loader = Loader("./templates")
+	tweet["html"] = loader.load("tweet_message.html").generate(tweet=tweet)
 	
-	
+	  
 	# Send the Twitter info to all the clients
 	for waiter in ChatSocketHandler.waiters:
 		try:
@@ -282,28 +320,63 @@ def TwitterListener(message):
 # Set things up
 def main():
 
+	# Set up Twitter stream
+	getTwitterSearchTerms()
+	stream = tweetstream.TweetStream(twitter_configuration)
+	update_status("Twitter tracking terms: %s" % twitter_tracking_terms, 1)
+	stream.fetch("/1/statuses/filter.json?track=" + twitter_tracking_terms, callback=TwitterListener)
+
+	# Set up Twitter search term refresh (convert hours to milliseconds)
+	twitter_def_callback = tornado.ioloop.PeriodicCallback(getTwitterSearchTerms, twitter_definition_refresh*60*60*1000)
+	twitter_def_callback.start()
+
+	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
+	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
+	instagram_callback.start()
+	
+	# Set up Tornado to send data to clients
+	tornado.options.parse_command_line()
+	app = Application()
+	app.listen(options.port)
+	
+	tornado.ioloop.IOLoop.instance().start()
+ 
+
+
+
+# Print timestamped status messages
+def update_status(msg, debug_status=0):
+	if debug_status <= debug_mode:
+		timestamp = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+		print "%s: %s" % ( timestamp, msg)
+
+
+
+
+
+def getTwitterSearchTerms():
+
+	global twitter_tracking_terms
+	global twitter_search_terms
+
+	update_status("Looking up Twitter definitions", 1)
+
 	# Get search terms from Google Docs spreadsheet published as a CSV file
 	r = requests.get(twitter_def_url)
 	f = StringIO.StringIO(r.text)
 	reader = csv.reader(f, delimiter=',')
-	
-	# Skip first three rows
-	reader.next
-	reader.next
-	reader.next
-	
+		
 	# Get a list of all the search terms.  Keep track of both the exact term (e.g. @swarthmore and #swarthmore) as well as a list of unique search
 	# terms for Twitter with no special characters
 	twitter_tracking_terms = []
 
-
 	for index,row in enumerate(reader):
 	
-		if index<3: 		# Skip first three rows
+		if index<1: 		# Skip first row
 			continue
 
 		# Store search term information
-		twitter_search_terms[row[0]]= {'color1':row[3], 'color2':row[5], 'mode': row[6]}
+		twitter_search_terms[row[0]]= {'color1':row[1], 'color2':row[2], 'mode': row[3]}
 		
 		# Set codes for LED mode
 		if twitter_search_terms[row[0]]["mode"] == "party_mode":
@@ -318,25 +391,11 @@ def main():
 
  
 	# Remove any duplicate items from the tracking terms by converting it into a set
+	# Then convert it to a string
 	twitter_tracking_terms =  ','.join(set(twitter_tracking_terms))
 
+	update_status("Done looking up Twitter definitions", 1)
 
-	# Set up Twitter stream
-	stream = tweetstream.TweetStream(twitter_configuration)
-	stream.fetch("/1/statuses/filter.json?track=" + twitter_tracking_terms, callback=TwitterListener)
-
-
-	# Set up Instagram call backs	
-	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, 10000)
-	instagram_callback.start()
-
-	# Set up Tornado to send data to clients
-	tornado.options.parse_command_line()
-	app = Application()
-	app.listen(options.port)
-
-	
-	tornado.ioloop.IOLoop.instance().start()
 
 
 

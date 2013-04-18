@@ -1,0 +1,18 @@
+{% autoescape None %}
+<div class="message instagram" id="{{ message["id"] }}" style="min-height: 160px;background-color:#eeeeee;border:3px solid #800000">
+	
+	<img style="height:150px;width150px;float:left;" src="{{ message["thumbnail_url"] }}">
+
+	<div style="vertical-align:top;margin-left:172px;min-height: 160px;">
+				
+		<span >
+			<b>{{ message["name"] }}</b> 
+		</span>  
+	
+		{{ message["caption"] }}
+	
+		<div style='width:100%%;font-size:50%%;text-align:right'>{{ message["timestamp"] }}</div>
+
+	</div>
+
+</div>
