@@ -35,12 +35,11 @@ Config = ConfigParser.ConfigParser()
 Config.read("swatsocial.conf")
 
 
-
 ### Tornado Configuration ###
 define("port", default=Config.get('app', "port"), help="run on the given port", type=int)
 debug_mode = Config.get('app', "debug_mode")
 
-
+ 
 ### Arduino Configuration ###
 arduino_ip = Config.get('Arduino', "ip_address")
 
@@ -68,8 +67,11 @@ instagram_last_tag_id = 0
 instagram_check_time = Config.getint('Instagram', "instagram_check_time")
 
 
-
-
+### Tumblr Configuration ###
+tumblr_api_url = Config.get('Tumblr', "tumblr_api_url")	
+tumblr_api_key = Config.get('Tumblr', "tumblr_api_key")	
+tumblr_check_time = Config.getint('Tumblr', "tumblr_check_time")
+tumblr_last_id = 0
 
 
 
@@ -89,6 +91,41 @@ class Application(tornado.web.Application):
 
 
 
+# Retrieve insteresting posts from Tumblr
+def check_tumblr():
+
+	global tumblr_api_key
+	global tumblr_api_url
+	global tumblr_last_id
+
+	# Request tagged posts from Tumblr
+	update_status("Searching for Tumblr posts.  Last id is %s" % tumblr_last_id, 1)
+	payload = {'tag': 'Swarthmore', 'api_key': tumblr_api_key}
+	r = requests.get(tumblr_api_url, params=payload)
+  
+	posts = r.json()	
+	for post in posts["response"]:
+		if  post["id"] > tumblr_last_id:
+		
+			# Send out post to clients
+			update_status("Found a new Tumblr post from %s" % post["blog_name"], 1)
+			loader = Loader("./templates")
+			post["timestamp"] = datetime.datetime.fromtimestamp(int(post["timestamp"])).strftime("%m/%d/%Y %H:%M:%S")
+			post["html"] = loader.load("tumblr_message.html").generate(message=post)	
+		
+		
+			# Send the Tumblr info to all the clients
+			for waiter in ChatSocketHandler.waiters:
+				try:
+					waiter.write_message(post)	
+				except:
+					logging.error("Error sending Tumblr message", exc_info=True)	
+
+	# Record the highest post id
+	for post in posts["response"]:
+		if post["id"] > tumblr_last_id:
+			tumblr_last_id = post["id"]
+
 
 
 def check_instagram():
@@ -100,7 +137,7 @@ def check_instagram():
 	
 	# 45845732 is Swarthmore College
 	# Note: "39556451" is the id for the Swarthmore location
-	"""	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
+	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
  
 	# Grab any new pictures
 	for media in ig_media:
@@ -136,7 +173,7 @@ def check_instagram():
 		if media.id > instagram_last_location_id:
 			instagram_last_location_id = media.id
 			
-	"""
+
 	update_status("Searching for instagram.  Last tag id is %s" % instagram_last_tag_id, 1)
 	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999999999, "swarthmore")
 	
@@ -284,6 +321,8 @@ def TwitterListener(message):
 	
 	logging.info("sending message to %d waiters", len(ChatSocketHandler.waiters))
 	
+	message["user"]["profile_image_url"] = message["user"]["profile_image_url"].replace('_normal.png', '_bigger.png') # Use larger image
+	
 	# Hyperlink URLs
 	tweet = {	"text": fix_urls(message["text"]), 
 				"id" : message["id_str"], 
@@ -305,10 +344,10 @@ def TwitterListener(message):
 	for waiter in ChatSocketHandler.waiters:
 		try:
 			waiter.write_message(tweet)
-			
+	
 		except:
 			logging.error("Error sending message", exc_info=True)
-
+		
 	# Send Arduino message
 	arduino_url = arduino_ip + "?id=" + str(id) + "&color1=" + color1 + "&color2=" + color2 + "&mode=" + str(display_mode)
 	try:
@@ -338,6 +377,13 @@ def main():
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
 	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
 	instagram_callback.start()
+
+	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
+	tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
+	tumblr_callback.start()
+
+
+
 
 	# Set up Tornado to send data to clients
 	tornado.options.parse_command_line()

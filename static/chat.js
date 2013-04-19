@@ -35,7 +35,7 @@ function newMessage(form) {
     updater.socket.send(JSON.stringify(message));
     form.find("input[type=text]").val("").select();
 }
-
+ 
 jQuery.fn.formToDict = function() {
     var fields = this.serializeArray();
     var json = {}

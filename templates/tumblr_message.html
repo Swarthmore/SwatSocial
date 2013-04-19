@@ -1,0 +1,73 @@
+{% autoescape None %}
+<div class="message tumblr" id="{{ message["id"] }}" style="position:relative;background-color:#eeeeee;border:3px solid #800000;max-height:600px;">
+	
+	<img style="float:right;" src="/static/tumblr_icon.png" >
+	
+	<img style="height:48px;width48px;float:left;" src="http://api.tumblr.com/v2/blog/{{ message["blog_name"] }}.tumblr.com/avatar/48">
+
+	<div style="position:relative;margin-left:60px;min-height:60px;max-height:580px;overflow:hidden;font-size:75%%">				
+		<div class="tumblr_heading">{{ message["blog_name"] }}</div>
+		
+		{% for tag in message["tags"] %}
+			{% block tag %}
+          		{{ tag }}&nbsp;
+        	{% end %}
+        {% end %}
+        	
+		{% if message["type"] == "text" %}
+			<BR><i>{{ message["title"] }}</i><BR>
+			{{ message["body"] }}
+		{% end %}
+		
+		{% if message["type"] == "photo" %}
+			{{ message["caption"] }}
+			{% for photo in message["photos"] %}
+				{% block photo %}
+          			 <img src="{{ photo["alt_sizes"][2]["url"] }}">
+        		{% end %}
+        	{% end %}
+		{% end %}	
+
+		{% if message["type"] == "quote" %}
+			<BR><i>{{ message["text"] }}</i><BR>
+			{{ message["source"] }}
+		{% end %}		
+
+		{% if message["type"] == "link" %}
+			<BR><i><a href="{{ message["url"] }}">{{ message["title"] }}</a></i><BR>
+			{{ message["description"] }}
+		{% end %}		
+
+		{% if message["type"] == "dialogue" %}
+			<BR>{{ message["body"] }}<BR>
+			{% for line in message["dialogue"] %}
+				{% block line %}
+          			 <i>{{ line["name"] }}</i>: {{ line["phrase"] }}<BR>
+        		{% end %}
+        	{% end %}
+		{% end %}	
+
+
+		{% if message["type"] == "audio" %}
+			<BR><i>{{ message["id3_title"] }}</i><BR>
+			{{ message["caption"] }}<BR>
+			{{ message["player"] }}
+		{% end %}		
+
+		{% if message["type"] == "video" %}
+			<BR>{{ message["caption"] }}<BR>
+			{{ message["player"][1] }}
+		{% end %}	
+
+		{% if message["type"] == "answer" %}
+			<BR><i>{{ message["question"] }}</i><BR>
+			{{ message["answer"] }}
+		{% end %}	
+		
+	</div>
+
+	<div style='position:absolute;bottom:0;right:0;width:50%%;font-size:50%%;text-align:right'>
+		{{ message["date"] }}
+	</div>
+
+</div>

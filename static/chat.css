@@ -22,7 +22,7 @@ body {
 body,
 input {
   font-family: sans-serif;
-  font-size: 10pt;
+  font-size: 24pt;
   color: black;
 }
 
@@ -59,4 +59,10 @@ td {
 #nav {
   float: right;
   z-index: 99;
+}
+
+
+.tumblr_heading{
+	font-size: 24pt;
+	font-weight: bold;
 }
