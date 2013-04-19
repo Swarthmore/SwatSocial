@@ -152,14 +152,7 @@ def check_instagram():
 		if media.id > instagram_last_location_id:
 			# This is a new picture -- post it
 			update_status("Found a new Instragram post by %s" % media.user.username, 1)
-			message = {	"id": media.id,
-						"thumbnail_url": media.images['thumbnail'].url,
-						"timestamp": media.created_time.strftime("%m/%d/%Y %H:%M:%S"),
-						"name": media.user.username,
-						"caption": "",
-						"filter": media.filter
-			 		} 
-	 
+
 			# Some media doesn't have a caption.  If it does -- include it		
 			if hasattr(media.caption, 'text'): 
 				message["caption"] = media.caption.text
@@ -188,7 +181,7 @@ def check_instagram():
 
 	update_status("Searching for instagram.  Last tag id is %s" % instagram_last_tag_id, 1)
 	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999999999, "swarthmore")
-	
+	 
 	for media in ig_media:
 		if media.id > instagram_last_tag_id:
 			# This is a new picture -- post it
@@ -200,7 +193,7 @@ def check_instagram():
 
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({'post': message}, callback=saved_instagram)
+   			db.instagram.insert({post: message}, callback=saved_instagram)
 
 
 			# Send media to template and post it
