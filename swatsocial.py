@@ -91,33 +91,30 @@ class Application(tornado.web.Application):
 
 
 
-
-
 def check_instagram():
 
 	global instagram_last_location_id
 	global instagram_last_tag_id
 
 	update_status("Searching for instagram.  Last location id is %s" % instagram_last_location_id, 1)
-	image_list= ""
 	
 	# 45845732 is Swarthmore College
 	# Note: "39556451" is the id for the Swarthmore location
-	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
-
-
+	"""	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
+ 
 	# Grab any new pictures
 	for media in ig_media:
 		if media.id > instagram_last_location_id:
 			# This is a new picture -- post it
-			update_status("Found a new Instragram post by %s" % media.user.username)
+			update_status("Found a new Instragram post by %s" % media.user.username, 1)
 			message = {	"id": media.id,
 						"thumbnail_url": media.images['thumbnail'].url,
-						"timestamp": datetime.datetime.now().strftime("%m/%d/%Y %H:%M:%S"),
+						"timestamp": media.created_time.strftime("%m/%d/%Y %H:%M:%S"),
 						"name": media.user.username,
-						"caption": ""
+						"caption": "",
+						"filter": media.filter
 					}
-	
+	 
 			# Some media doesn't have a caption.  If it does -- include it		
 			if hasattr(media.caption, 'text'): 
 				message["caption"] = media.caption.text
@@ -139,34 +136,42 @@ def check_instagram():
 		if media.id > instagram_last_location_id:
 			instagram_last_location_id = media.id
 			
-	
-
+	"""
+	update_status("Searching for instagram.  Last tag id is %s" % instagram_last_tag_id, 1)
 	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999999999, "swarthmore")
-	# Grab any new pictures
+	
 	for media in ig_media:
 		if media.id > instagram_last_tag_id:
-			x =   "%s" % (media.filter)
-			
-			image_list +=  "<div class='message'><img style='align: left;vertical-align:text-top;margin:5px' src='" + media.images['thumbnail'].url + "'>" + media.user.username + ": " + media.caption.text + "(" + x + ")</div>"
-				 
+			# This is a new picture -- post it
+			update_status("Found a new Instragram post by %s at %s" % (media.user.username, media.created_time), 1)
+			message = {	"id": media.id,
+						"thumbnail_url": media.images['thumbnail'].url,
+						"timestamp": media.created_time.strftime("%m/%d/%Y %H:%M:%S"),
+						"name": media.user.username,
+						"caption": "",
+						"filter": media.filter
+					}
+	
+			# Some media doesn't have a caption.  If it does -- include it		
+			if hasattr(media.caption, 'text'): 
+				message["caption"] = media.caption.text
 
+			# Send media to template and post it
+			loader = Loader("./templates")
+			message["html"] = loader.load("instagram_message.html").generate(message=message)
+
+			# Send the Instagram info to all the clients
+			for waiter in ChatSocketHandler.waiters:
+				try:
+					waiter.write_message(message)	
+				except:
+					logging.error("Error sending Instrgram message", exc_info=True)	
+	
+				
 	# Find the highest id and save it
 	for media in ig_media:
 		if media.id > instagram_last_tag_id:
 			instagram_last_tag_id = media.id
-
-	if image_list != "":	
-		message = {"html" : "<div>" + image_list + "</div>"}
-
-		# Send the Instagram info to all the clients
-		for waiter in ChatSocketHandler.waiters:
-			try:
-			
-				waiter.write_message(message)
-			
-			except:
-				logging.error("Error sending message", exc_info=True)
-
 
 
 
@@ -294,7 +299,7 @@ def TwitterListener(message):
 
 	loader = Loader("./templates")
 	tweet["html"] = loader.load("tweet_message.html").generate(tweet=tweet)
-	
+
 	  
 	# Send the Twitter info to all the clients
 	for waiter in ChatSocketHandler.waiters:
@@ -309,7 +314,7 @@ def TwitterListener(message):
 	try:
 		print "Sending to Arduino: " + arduino_url
 		r = requests.get(arduino_url, timeout=4)
-			
+		
 	except requests.exceptions.Timeout:
 		print "Arduino request timed out" 
                 
@@ -333,7 +338,7 @@ def main():
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
 	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
 	instagram_callback.start()
-	
+
 	# Set up Tornado to send data to clients
 	tornado.options.parse_command_line()
 	app = Application()
