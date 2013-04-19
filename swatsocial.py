@@ -2,13 +2,6 @@
 
 # Program to capture social media, display it, and integrate with an Arduino.
 
-
-
-"""Simplified chat demo for websockets.
-
-Authentication, error handling, etc are left as an exercise for the reader :)
-"""
-
 import logging
 import tornado.escape
 import tornado.ioloop
@@ -28,7 +21,7 @@ import datetime
 from tornado.options import define, options
 from tornado.template import Template, Loader
 from instagram.client import InstagramAPI
-
+import motor
 
 # Load config 
 Config = ConfigParser.ConfigParser()
@@ -75,19 +68,29 @@ tumblr_last_id = 0
 
 
 
+# Set up Motor and connection to MongoDB
+client = motor.MotorClient('ec2-50-19-28-191.compute-1.amazonaws.com', 27017).open_sync()
+db = client['swatsocial']
+
+
 class Application(tornado.web.Application):
-    def __init__(self):
-        handlers = [
-            (r"/", MainHandler),
-            (r"/chatsocket", ChatSocketHandler),
-        ]
-        settings = dict(
-            template_path=os.path.join(os.path.dirname(__file__), "templates"),
-            static_path=os.path.join(os.path.dirname(__file__), "static"),
-            debug=True             
-        )
+
+	
+
+	def __init__(self):
+		handlers = [
+			(r"/", MainHandler),
+			(r"/chatsocket", ChatSocketHandler),
+		]
+		
+		settings = dict(
+			template_path=os.path.join(os.path.dirname(__file__), "templates"),
+			static_path=os.path.join(os.path.dirname(__file__), "static"),
+			debug=True, 
+			db=db          
+		)
         
-        tornado.web.Application.__init__(self, handlers, **settings)
+		tornado.web.Application.__init__(self, handlers, **settings)
 
 
 
@@ -109,6 +112,11 @@ def check_tumblr():
 		
 			# Send out post to clients
 			update_status("Found a new Tumblr post from %s" % post["blog_name"], 1)
+			
+			# Save the Tumblr post
+			# Async insert; callback is executed when insert completes
+   			db.tumblr.insert({'post': post}, callback=saved_tumblr)
+			
 			loader = Loader("./templates")
 			post["timestamp"] = datetime.datetime.fromtimestamp(int(post["timestamp"])).strftime("%m/%d/%Y %H:%M:%S")
 			post["html"] = loader.load("tumblr_message.html").generate(message=post)	
@@ -135,9 +143,9 @@ def check_instagram():
 
 	update_status("Searching for instagram.  Last location id is %s" % instagram_last_location_id, 1)
 	
-	# 45845732 is Swarthmore College
+	# 45845732 or 10192151 is Swarthmore College --> don't return recent links
 	# Note: "39556451" is the id for the Swarthmore location
-	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 45845732)
+	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 39556451)
  
 	# Grab any new pictures
 	for media in ig_media:
@@ -150,15 +158,19 @@ def check_instagram():
 						"name": media.user.username,
 						"caption": "",
 						"filter": media.filter
-					}
+			 		} 
 	 
 			# Some media doesn't have a caption.  If it does -- include it		
 			if hasattr(media.caption, 'text'): 
 				message["caption"] = media.caption.text
 
+			# Save the Instagram post
+			# Async insert; callback is executed when insert completes
+   			db.instagram.insert({'post': message}, callback=saved_instagram)
+
 			# Send media to template and post it
 			loader = Loader("./templates")
-			message["html"] = loader.load("instagram_message.html").generate(message=message)
+			message["html"] = loader.load("instagram_message.html").generate(message=media)
 
 			# Send the Instagram info to all the clients
 			for waiter in ChatSocketHandler.waiters:
@@ -167,7 +179,7 @@ def check_instagram():
 				except:
 					logging.error("Error sending Instrgram message", exc_info=True)
 
-				
+ 				
 	# Find the highest id and save it
 	for media in ig_media:
 		if media.id > instagram_last_location_id:
@@ -181,21 +193,19 @@ def check_instagram():
 		if media.id > instagram_last_tag_id:
 			# This is a new picture -- post it
 			update_status("Found a new Instragram post by %s at %s" % (media.user.username, media.created_time), 1)
-			message = {	"id": media.id,
-						"thumbnail_url": media.images['thumbnail'].url,
-						"timestamp": media.created_time.strftime("%m/%d/%Y %H:%M:%S"),
-						"name": media.user.username,
-						"caption": "",
-						"filter": media.filter
-					}
 	
 			# Some media doesn't have a caption.  If it does -- include it		
 			if hasattr(media.caption, 'text'): 
 				message["caption"] = media.caption.text
 
+			# Save the Instagram post
+			# Async insert; callback is executed when insert completes
+   			db.instagram.insert({'post': message}, callback=saved_instagram)
+
+
 			# Send media to template and post it
 			loader = Loader("./templates")
-			message["html"] = loader.load("instagram_message.html").generate(message=message)
+			message["html"] = loader.load("instagram_message.html").generate(message=media)
 
 			# Send the Instagram info to all the clients
 			for waiter in ChatSocketHandler.waiters:
@@ -218,9 +228,6 @@ def check_instagram():
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("index.html", messages=ChatSocketHandler.cache)
-
-
-
 
 
 
@@ -266,6 +273,7 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
 
         ChatSocketHandler.update_cache(chat)
         ChatSocketHandler.send_updates(chat)
+
 
 
 
@@ -339,6 +347,10 @@ def TwitterListener(message):
 	loader = Loader("./templates")
 	tweet["html"] = loader.load("tweet_message.html").generate(tweet=tweet)
 
+	# Save the tweet
+	# Async insert; callback is executed when insert completes
+   	db.tweets.insert({'tweet': tweet}, callback=saved_tweet)
+	
 	  
 	# Send the Twitter info to all the clients
 	for waiter in ChatSocketHandler.waiters:
@@ -359,6 +371,27 @@ def TwitterListener(message):
                 
 	except:
 		print "Cannot connect to Arduino"            
+
+
+ 
+def saved_tweet(result, error):
+	if error:
+		update_status("Could not save Tweet to database: %s" % error, 1)
+	else:
+		update_status("Tweet saved to database", 1)
+	
+
+def saved_instagram(result, error):
+	if error:
+		update_status("Could not save Instagram to database: %s" % error, 1)
+	else:
+		update_status("Instagram saved to database", 1)
+
+def saved_tumblr(result, error):
+	if error:
+		update_status("Could not save Tumblr postto database: %s" % error, 1)
+	else:
+		update_status("Tumblr post saved to database", 1)
 
 
 # Set things up
