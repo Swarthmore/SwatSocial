@@ -115,7 +115,7 @@ def check_tumblr():
 			
 			# Save the Tumblr post
 			# Async insert; callback is executed when insert completes
-   			db.tumblr.insert({'post': post}, callback=saved_tumblr)
+   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
 			
 			loader = Loader("./templates")
 			post["timestamp"] = datetime.datetime.fromtimestamp(int(post["timestamp"])).strftime("%m/%d/%Y %H:%M:%S")
@@ -146,29 +146,26 @@ def check_instagram():
 	# 45845732 or 10192151 is Swarthmore College --> don't return recent links
 	# Note: "39556451" is the id for the Swarthmore location
 	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 39556451)
- 
+ 	msg = {}
+ 	
 	# Grab any new pictures
 	for media in ig_media:
 		if media.id > instagram_last_location_id:
 			# This is a new picture -- post it
 			update_status("Found a new Instragram post by %s" % media.user.username, 1)
 
-			# Some media doesn't have a caption.  If it does -- include it		
-			if hasattr(media.caption, 'text'): 
-				message["caption"] = media.caption.text
-
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({'post': message}, callback=saved_instagram)
+   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
-			message["html"] = loader.load("instagram_message.html").generate(message=media)
+			msg["html"] = loader.load("instagram_message.html").generate(message=media)
 
 			# Send the Instagram info to all the clients
 			for waiter in ChatSocketHandler.waiters:
 				try:
-					waiter.write_message(message)	
+					waiter.write_message(msg)	
 				except:
 					logging.error("Error sending Instrgram message", exc_info=True)
 
@@ -187,23 +184,18 @@ def check_instagram():
 			# This is a new picture -- post it
 			update_status("Found a new Instragram post by %s at %s" % (media.user.username, media.created_time), 1)
 	
-			# Some media doesn't have a caption.  If it does -- include it		
-			if hasattr(media.caption, 'text'): 
-				message["caption"] = media.caption.text
-
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({post: message}, callback=saved_instagram)
-
+   			db.instagram.insert({media}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
-			message["html"] = loader.load("instagram_message.html").generate(message=media)
+			msg["html"] = loader.load("instagram_message.html").generate(message=media)
 
 			# Send the Instagram info to all the clients
 			for waiter in ChatSocketHandler.waiters:
 				try:
-					waiter.write_message(message)	
+					waiter.write_message(msg)	
 				except:
 					logging.error("Error sending Instrgram message", exc_info=True)	
 	
