@@ -115,7 +115,7 @@ def check_tumblr():
 			
 			# Save the Tumblr post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
+   			db.tumblr.insert({'post': post}, callback=saved_tumblr)
 			
 			loader = Loader("./templates")
 			post["timestamp"] = datetime.datetime.fromtimestamp(int(post["timestamp"])).strftime("%m/%d/%Y %H:%M:%S")
@@ -168,6 +168,20 @@ def check_instagram():
 					waiter.write_message(msg)	
 				except:
 					logging.error("Error sending Instrgram message", exc_info=True)
+			
+			# Send Arduino message
+			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
+			try:
+				print "Sending to Arduino: " + arduino_url
+				r = requests.get(arduino_url, timeout=4)
+		
+			except requests.exceptions.Timeout:
+				print "Arduino request timed out" 
+				
+			except:
+				print "Cannot connect to Arduino"            
+
+
 
  				
 	# Find the highest id and save it
@@ -186,7 +200,7 @@ def check_instagram():
 	
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({media}, callback=saved_instagram)
+   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
@@ -197,7 +211,19 @@ def check_instagram():
 				try:
 					waiter.write_message(msg)	
 				except:
-					logging.error("Error sending Instrgram message", exc_info=True)	
+					logging.error("Error sending Instagram message", exc_info=True)	
+			
+			# Send Arduino message
+			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
+			try:
+				print "Sending to Arduino: " + arduino_url
+				r = requests.get(arduino_url, timeout=4)
+		
+			except requests.exceptions.Timeout:
+				print "Arduino request timed out" 
+				
+			except:
+				print "Cannot connect to Arduino"   
 	
 				
 	# Find the highest id and save it
@@ -294,7 +320,7 @@ def TwitterListener(message):
 		print tweet_text
 		for key, value in twitter_search_terms.iteritems():
 			print key.lower()
-			if tweet_text.find(key.lower()) > 0:
+			if tweet_text.find(key.lower()) >= 0:
 				print "Matched search term: " + key
 				color1 = value["color1"]
 				color2 = value["color2"]
@@ -398,7 +424,7 @@ def main():
 
 	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
 	tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
-	tumblr_callback.start()
+	#tumblr_callback.start()
 
 
 
