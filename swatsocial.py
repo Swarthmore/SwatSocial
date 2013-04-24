@@ -8,6 +8,7 @@ import tornado.ioloop
 import tornado.options
 import tornado.web
 import tornado.websocket
+import tornado.gen
 import os.path
 import uuid
 import tweetstream
@@ -135,7 +136,6 @@ def check_tumblr():
 			tumblr_last_id = post["id"]
 
 
-
 def check_instagram():
 
 	global instagram_last_location_id
@@ -156,7 +156,7 @@ def check_instagram():
 
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
+   			db.instagram.insert({"id": media.id, "created_time": media.created_time, "caption":media.caption.text,"username": media.user.username, "filter":media.filter}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
@@ -173,7 +173,7 @@ def check_instagram():
 			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
 			try:
 				print "Sending to Arduino: " + arduino_url
-				r = requests.get(arduino_url, timeout=4)
+				#r = requests.get(arduino_url, timeout=4)
 		
 			except requests.exceptions.Timeout:
 				print "Arduino request timed out" 
@@ -200,7 +200,7 @@ def check_instagram():
 	
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({"id": media.id, "created_time": media.created_time}, callback=saved_instagram)
+   			db.instagram.insert({"id": media.id, "created_time": media.created_time, "caption":media.caption.text,"username": media.user.username, "filter":media.filter}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
@@ -217,7 +217,7 @@ def check_instagram():
 			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
 			try:
 				print "Sending to Arduino: " + arduino_url
-				r = requests.get(arduino_url, timeout=4)
+				#r = requests.get(arduino_url, timeout=4)
 		
 			except requests.exceptions.Timeout:
 				print "Arduino request timed out" 
@@ -405,7 +405,14 @@ def saved_tumblr(result, error):
 		update_status("Tumblr post saved to database", 1)
 
 
+
+
+
+
+
+
 # Set things up
+@tornado.gen.coroutine
 def main():
 
 	# Set up Twitter stream
@@ -419,11 +426,27 @@ def main():
 	twitter_def_callback.start()
 
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
+	# Get latest instagram posts from the database
+	print "----- Looking for recent Instagram posts"
+	cursor = db.instagram.find({"created_time":{"$gte": datetime.datetime(2013, 4, 23)}})
+	
+	posts = []
+	while (yield cursor.fetch_next):
+		document = cursor.next_object()
+		#if document["id"] > instagram_last_tag_id:
+		#	instagram_last_tag_id = document["id"]
+		#	instagram_last_location_id = document["id"]
+
+	print "----- End of recent instagram posts"
+
+
+	
+	
 	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
 	instagram_callback.start()
 
 	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
-	tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
+	#tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
 	#tumblr_callback.start()
 
 
