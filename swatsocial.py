@@ -8,7 +8,6 @@ import tornado.ioloop
 import tornado.options
 import tornado.web
 import tornado.websocket
-import tornado.gen
 import os.path
 import uuid
 import tweetstream
@@ -22,7 +21,7 @@ import datetime
 from tornado.options import define, options
 from tornado.template import Template, Loader
 from instagram.client import InstagramAPI
-import motor
+from pymongo import MongoClient
 
 # Load config 
 Config = ConfigParser.ConfigParser()
@@ -50,6 +49,7 @@ twitter_configuration = {
 }
 
 twitter_tracking_terms = ""
+twitter_follows = ""
 twitter_search_terms = {}
 twitter_definition_refresh = Config.getint('Twitter', "twitter_definition_refresh")
 
@@ -68,15 +68,44 @@ tumblr_check_time = Config.getint('Tumblr', "tumblr_check_time")
 tumblr_last_id = 0
 
 
+### Database Configuration ###
+client = MongoClient(Config.get('DB', "db_host"), 27017)
+db = client[Config.get('DB', "db_name")]
 
-# Set up Motor and connection to MongoDB
-client = motor.MotorClient('ec2-50-19-28-191.compute-1.amazonaws.com', 27017).open_sync()
-db = client['swatsocial']
+
+# Get latest Tweets posts from the database
+print "----- Looking for recent Tweets"
+cursor = db.tweets.find({"created_time":{"$gte": datetime.datetime(2013, 3, 23)}}).sort("id",-1)
+
+ig_posts = []
+for document in cursor:
+	print document["id"]
+	ig_posts.append(document)
+	if document["id"] > instagram_last_tag_id:
+		instagram_last_tag_id = document["id"]
+		instagram_last_location_id = document["id"]
+
+print "----- End of recent tweets"
+
+
+# Get latest instagram posts from the database
+print "----- Looking for recent Instagram posts"
+cursor = db.instagram.find({"created_time":{"$gte": datetime.datetime(2013, 3, 23)}}).sort("id",-1)
+
+ig_posts = []
+for document in cursor:
+	print document["id"]
+	ig_posts.append(document)
+	if document["id"] > instagram_last_tag_id:
+		instagram_last_tag_id = document["id"]
+		instagram_last_location_id = document["id"]
+
+print "----- End of recent instagram posts"
+
+
 
 
 class Application(tornado.web.Application):
-
-	
 
 	def __init__(self):
 		handlers = [
@@ -116,7 +145,7 @@ def check_tumblr():
 			
 			# Save the Tumblr post
 			# Async insert; callback is executed when insert completes
-   			db.tumblr.insert({'post': post}, callback=saved_tumblr)
+   			#db.tumblr.insert({'post': post}, callback=saved_tumblr)
 			
 			loader = Loader("./templates")
 			post["timestamp"] = datetime.datetime.fromtimestamp(int(post["timestamp"])).strftime("%m/%d/%Y %H:%M:%S")
@@ -156,7 +185,8 @@ def check_instagram():
 
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({"id": media.id, "created_time": media.created_time, "caption":media.caption.text,"username": media.user.username, "filter":media.filter}, callback=saved_instagram)
+			#print media.id, media.created_time, media.caption.text, media.user.username, media.filter
+   			#db.instagram.insert({'filter': media.filter}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
@@ -173,7 +203,7 @@ def check_instagram():
 			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
 			try:
 				print "Sending to Arduino: " + arduino_url
-				#r = requests.get(arduino_url, timeout=4)
+				r = requests.get(arduino_url, timeout=4)
 		
 			except requests.exceptions.Timeout:
 				print "Arduino request timed out" 
@@ -200,7 +230,9 @@ def check_instagram():
 	
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
-   			db.instagram.insert({"id": media.id, "created_time": media.created_time, "caption":media.caption.text,"username": media.user.username, "filter":media.filter}, callback=saved_instagram)
+			print media.id, media.created_time, media.caption.text, media.user.username, media.filter
+			
+   			#db.instagram.insert({'filter': media.filter}, callback=saved_instagram)
 
 			# Send media to template and post it
 			loader = Loader("./templates")
@@ -217,7 +249,7 @@ def check_instagram():
 			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
 			try:
 				print "Sending to Arduino: " + arduino_url
-				#r = requests.get(arduino_url, timeout=4)
+				r = requests.get(arduino_url, timeout=4)
 		
 			except requests.exceptions.Timeout:
 				print "Arduino request timed out" 
@@ -319,7 +351,7 @@ def TwitterListener(message):
 		tweet_text =  message["text"].lower()
 		print tweet_text
 		for key, value in twitter_search_terms.iteritems():
-			print key.lower()
+			#print key.lower()
 			if tweet_text.find(key.lower()) >= 0:
 				print "Matched search term: " + key
 				color1 = value["color1"]
@@ -360,7 +392,7 @@ def TwitterListener(message):
 
 	# Save the tweet
 	# Async insert; callback is executed when insert completes
-   	db.tweets.insert({'tweet': tweet}, callback=saved_tweet)
+   	#db.tweets.insert({'tweet':tweet}, callback=saved_tweet)
 	
 	  
 	# Send the Twitter info to all the clients
@@ -412,36 +444,20 @@ def saved_tumblr(result, error):
 
 
 # Set things up
-@tornado.gen.coroutine
 def main():
 
 	# Set up Twitter stream
 	getTwitterSearchTerms()
 	stream = tweetstream.TweetStream(twitter_configuration)
 	update_status("Twitter tracking terms: %s" % twitter_tracking_terms, 1)
-	stream.fetch("/1/statuses/filter.json?track=" + twitter_tracking_terms, callback=TwitterListener)
+	update_status("Twitter following ids: %s" % twitter_follows, 1)
+	stream.fetch("/1/statuses/filter.json?track=" + twitter_tracking_terms + "&follow=" + twitter_follows, callback=TwitterListener)
 
 	# Set up Twitter search term refresh (convert hours to milliseconds)
 	twitter_def_callback = tornado.ioloop.PeriodicCallback(getTwitterSearchTerms, twitter_definition_refresh*60*60*1000)
 	twitter_def_callback.start()
 
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
-	# Get latest instagram posts from the database
-	print "----- Looking for recent Instagram posts"
-	cursor = db.instagram.find({"created_time":{"$gte": datetime.datetime(2013, 4, 23)}})
-	
-	posts = []
-	while (yield cursor.fetch_next):
-		document = cursor.next_object()
-		#if document["id"] > instagram_last_tag_id:
-		#	instagram_last_tag_id = document["id"]
-		#	instagram_last_location_id = document["id"]
-
-	print "----- End of recent instagram posts"
-
-
-	
-	
 	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
 	instagram_callback.start()
 
@@ -476,7 +492,8 @@ def getTwitterSearchTerms():
 
 	global twitter_tracking_terms
 	global twitter_search_terms
-
+	global twitter_follows
+	
 	update_status("Looking up Twitter definitions", 1)
 
 	# Get search terms from Google Docs spreadsheet published as a CSV file
@@ -487,7 +504,7 @@ def getTwitterSearchTerms():
 	# Get a list of all the search terms.  Keep track of both the exact term (e.g. @swarthmore and #swarthmore) as well as a list of unique search
 	# terms for Twitter with no special characters
 	twitter_tracking_terms = []
-
+	twitter_follows_list = []
 	for index,row in enumerate(reader):
 	
 		if index<1: 		# Skip first row
@@ -495,6 +512,9 @@ def getTwitterSearchTerms():
 
 		# Store search term information
 		twitter_search_terms[row[0]]= {'color1':row[1], 'color2':row[2], 'mode': row[3]}
+		
+		if row[5] != "":
+			twitter_follows_list.append(row[5])
 		
 		# Set codes for LED mode
 		if twitter_search_terms[row[0]]["mode"] == "party_mode":
@@ -508,9 +528,11 @@ def getTwitterSearchTerms():
 		twitter_tracking_terms.append(''.join(e for e in row[0] if e.isalnum()))		
 
  
-	# Remove any duplicate items from the tracking terms by converting it into a set
+	# Remove any duplicate items from the tracking terms and follows by converting it into a set
 	# Then convert it to a string
 	twitter_tracking_terms =  ','.join(set(twitter_tracking_terms))
+	twitter_follows = ",".join(set(twitter_follows_list))
+
 
 	update_status("Done looking up Twitter definitions", 1)
 
