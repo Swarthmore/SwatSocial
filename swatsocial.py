@@ -21,7 +21,7 @@ import datetime
 import time
 from tornado.options import define, options
 from tornado.template import Template, Loader
-from instagram.client import InstagramAPI
+#from instagram.client import InstagramAPI
 from pymongo import MongoClient
 
 # Load config 
@@ -55,7 +55,7 @@ twitter_definition_refresh = Config.getint('Twitter', "twitter_definition_refres
 
 
 ### Instagram Configuration ###
-instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"))
+#instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"))
 instagram_last_location_id = 0
 instagram_last_tag_id = 0
 instagram_check_time = Config.getint('Instagram', "instagram_check_time")
@@ -170,7 +170,7 @@ def check_instagram():
 
 	global instagram_last_location_id
 	global instagram_last_tag_id
-
+"""
 	update_status("Searching for instagram.  Last location id is %s" % instagram_last_location_id, 1)
 	
 	# 45845732 or 10192151 is Swarthmore College --> don't return recent links
@@ -266,7 +266,7 @@ def check_instagram():
 		if media.id > instagram_last_tag_id:
 			instagram_last_tag_id = media.id
 
-
+"""
  
 
 
@@ -475,8 +475,8 @@ def main():
 	twitter_def_callback.start()
 
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
-	instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
-	instagram_callback.start()
+	#instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
+	#instagram_callback.start()
 
 	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
 	#tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
