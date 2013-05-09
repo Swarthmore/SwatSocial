@@ -18,6 +18,7 @@ from itertools import islice
 import re
 import ConfigParser
 import datetime
+import time
 from tornado.options import define, options
 from tornado.template import Template, Loader
 from instagram.client import InstagramAPI
@@ -35,7 +36,6 @@ debug_mode = Config.get('app', "debug_mode")
  
 ### Arduino Configuration ###
 arduino_ip = Config.get('Arduino', "ip_address")
-
 
 
 ### Twitter Configuration ###
@@ -111,6 +111,7 @@ class Application(tornado.web.Application):
 		handlers = [
 			(r"/", MainHandler),
 			(r"/chatsocket", ChatSocketHandler),
+			(r"/instagram_subscription", Instagram_Sub),
 		]
 		
 		settings = dict(
@@ -227,6 +228,8 @@ def check_instagram():
 		if media.id > instagram_last_tag_id:
 			# This is a new picture -- post it
 			update_status("Found a new Instragram post by %s at %s" % (media.user.username, media.created_time), 1)
+			update_status("Instagram time, localtime %s at %s" % (media.created_time, time.localtime(media.created_time)), 1)
+	
 	
 			# Save the Instagram post
 			# Async insert; callback is executed when insert completes
@@ -264,13 +267,27 @@ def check_instagram():
 			instagram_last_tag_id = media.id
 
 
-
+ 
 
 
 
 class MainHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.render("index.html", messages=ChatSocketHandler.cache)
+	def get(self):
+		self.render("index.html", messages=ChatSocketHandler.cache)
+
+
+
+
+class Instagram_Sub(tornado.web.RequestHandler):
+	def get(self):
+		challenge = self.get_argument("hub.challenge","")
+		self.render("instagram_subscription_verification.html", challenge=challenge)
+
+
+
+
+
+
 
 
 
