@@ -14,15 +14,17 @@ import tweetstream
 import requests 
 import StringIO
 import csv
-from itertools import islice
+from itertools import islice 
 import re
 import ConfigParser
 import datetime
 import time
+import json
 from tornado.options import define, options
 from tornado.template import Template, Loader
 #from instagram.client import InstagramAPI
 from pymongo import MongoClient
+import os
 
 # Load config 
 Config = ConfigParser.ConfigParser()
@@ -55,11 +57,17 @@ twitter_definition_refresh = Config.getint('Twitter', "twitter_definition_refres
 
 
 ### Instagram Configuration ###
-#instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"))
+#instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"), 
+#	client_id=Config.get('Instagram', "instagram_client_id"), 
+#	client_secret=Config.get('Instagram', "instagram_client_secret"))
+	 
 instagram_last_location_id = 0
-instagram_last_tag_id = 0
+instagram_last_tag_id = "0"
+instagram_last_geography_id = "0"
 instagram_check_time = Config.getint('Instagram', "instagram_check_time")
-
+instagram_client_secret = Config.get('Instagram', "instagram_client_secret")
+instagram_access_token = Config.get('Instagram', "instagram_access_token")
+instagram_client_id = Config.get('Instagram', "instagram_client_id")
 
 ### Tumblr Configuration ###
 tumblr_api_url = Config.get('Tumblr', "tumblr_api_url")	
@@ -72,6 +80,11 @@ tumblr_last_id = 0
 client = MongoClient(Config.get('DB', "db_host"), 27017)
 db = client[Config.get('DB', "db_name")]
 
+### Set time zone ###
+os.environ['TZ'] = 'America/New_York'
+time.tzset()
+
+
 
 # Get latest Tweets posts from the database
 print "----- Looking for recent Tweets"
@@ -81,8 +94,8 @@ ig_posts = []
 for document in cursor:
 	print document["id"]
 	ig_posts.append(document)
-	if document["id"] > instagram_last_tag_id:
-		instagram_last_tag_id = document["id"]
+	if document["id"] > instagram_last_id:
+		instagram_last_id = document["id"]
 		instagram_last_location_id = document["id"]
 
 print "----- End of recent tweets"
@@ -96,8 +109,8 @@ ig_posts = []
 for document in cursor:
 	print document["id"]
 	ig_posts.append(document)
-	if document["id"] > instagram_last_tag_id:
-		instagram_last_tag_id = document["id"]
+	if document["id"] > instagram_last_id:
+		instagram_last_id = document["id"]
 		instagram_last_location_id = document["id"]
 
 print "----- End of recent instagram posts"
@@ -166,108 +179,6 @@ def check_tumblr():
 			tumblr_last_id = post["id"]
 
 
-def check_instagram():
-
-	global instagram_last_location_id
-	global instagram_last_tag_id
-"""
-	update_status("Searching for instagram.  Last location id is %s" % instagram_last_location_id, 1)
-	
-	# 45845732 or 10192151 is Swarthmore College --> don't return recent links
-	# Note: "39556451" is the id for the Swarthmore location
-	ig_media, next =  instagram_api.location_recent_media(100, 999999999999999999999999, 39556451)
- 	msg = {}
- 	
-	# Grab any new pictures
-	for media in ig_media:
-		if media.id > instagram_last_location_id:
-			# This is a new picture -- post it
-			update_status("Found a new Instragram post by %s" % media.user.username, 1)
-
-			# Save the Instagram post
-			# Async insert; callback is executed when insert completes
-			#print media.id, media.created_time, media.caption.text, media.user.username, media.filter
-   			#db.instagram.insert({'filter': media.filter}, callback=saved_instagram)
-
-			# Send media to template and post it
-			loader = Loader("./templates")
-			msg["html"] = loader.load("instagram_message.html").generate(message=media)
-
-			# Send the Instagram info to all the clients
-			for waiter in ChatSocketHandler.waiters:
-				try:
-					waiter.write_message(msg)	
-				except:
-					logging.error("Error sending Instrgram message", exc_info=True)
-			
-			# Send Arduino message
-			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
-			try:
-				print "Sending to Arduino: " + arduino_url
-				r = requests.get(arduino_url, timeout=4)
-		
-			except requests.exceptions.Timeout:
-				print "Arduino request timed out" 
-				
-			except:
-				print "Cannot connect to Arduino"            
-
-
-
- 				
-	# Find the highest id and save it
-	for media in ig_media:
-		if media.id > instagram_last_location_id:
-			instagram_last_location_id = media.id
-			
-
-	update_status("Searching for instagram.  Last tag id is %s" % instagram_last_tag_id, 1)
-	ig_media, next = instagram_api.tag_recent_media(100, 99999999999999999999999, "swarthmore")
-	 
-	for media in ig_media:
-		if media.id > instagram_last_tag_id:
-			# This is a new picture -- post it
-			update_status("Found a new Instragram post by %s at %s" % (media.user.username, media.created_time), 1)
-			update_status("Instagram time, localtime %s at %s" % (media.created_time, time.localtime(media.created_time)), 1)
-	
-	
-			# Save the Instagram post
-			# Async insert; callback is executed when insert completes
-			print media.id, media.created_time, media.caption.text, media.user.username, media.filter
-			
-   			#db.instagram.insert({'filter': media.filter}, callback=saved_instagram)
-
-			# Send media to template and post it
-			loader = Loader("./templates")
-			msg["html"] = loader.load("instagram_message.html").generate(message=media)
-
-			# Send the Instagram info to all the clients
-			for waiter in ChatSocketHandler.waiters:
-				try:
-					waiter.write_message(msg)	
-				except:
-					logging.error("Error sending Instagram message", exc_info=True)	
-			
-			# Send Arduino message
-			arduino_url = arduino_ip + "?id=" + str(media.id) + "&color1=FFFFFF&color2=000000&mode=2"
-			try:
-				print "Sending to Arduino: " + arduino_url
-				r = requests.get(arduino_url, timeout=4)
-		
-			except requests.exceptions.Timeout:
-				print "Arduino request timed out" 
-				
-			except:
-				print "Cannot connect to Arduino"   
-	
-				
-	# Find the highest id and save it
-	for media in ig_media:
-		if media.id > instagram_last_tag_id:
-			instagram_last_tag_id = media.id
-
-"""
- 
 
 
 
@@ -279,14 +190,123 @@ class MainHandler(tornado.web.RequestHandler):
 
 
 class Instagram_Sub(tornado.web.RequestHandler):
+
+	
 	def get(self):
 		challenge = self.get_argument("hub.challenge","")
-		self.render("instagram_subscription_verification.html", challenge=challenge)
+		if len(challenge) > 0:
+			self.render("instagram_subscription_verification.html", challenge=challenge)
+		
+	def post(self):
+	
+		global instagram_last_id
+	
+		# Figure out what is posted from Instagram
+		x_hub_signature = self.get_argument('X-Hub-Signature', "")
+	 	
+		ig_updates = json.loads(self.request.body)
+	 	
+		# Need to respond within 2 seconds
+		self.write("Got it")
+		
+		for update in ig_updates:
+		
+			ig_request_url = ""
+			
+			if update["object"] == "tag":
+				# Pull down recent posts with matching tags
+				ig_request_url = "https://api.instagram.com/v1/tags/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_id
+			
+			elif update["object"] == "location":
+				# Pull down recent posts with matching locations
+				ig_request_url = "https://api.instagram.com/v1/locations/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_id=" + instagram_last_id
+				
+			elif update["object"] == "geography":
+				# Pull down recent posts with matching geographies
+				ig_request_url = "https://api.instagram.com/v1/geographies/" + update["object_id"] + "/media/recent?client_id=" + instagram_client_id + "&min_id=" + instagram_last_id	
+				
+			elif update["object"] == "user":
+				# Pull down recent posts with matching user
+				ig_request_url = "https://api.instagram.com/v1/users/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_id
+				
+			else:
+				# Don't know what to look for
+				update_status("Can't find a matching Instagram type to return", 1)
+				return
+				
+				
+			print 
+			print update
+			print ig_request_url
+			
+			r = requests.get(ig_request_url , timeout=5)
+			
+			print "***************"
+			print "Instgram text:" + r.text
+			print "***************"
+			
+	 		r_json = json.loads(r.text)
+			
+			# If min_tag_id was send, check to see if it later than the current last id
+			# Note - geography and tag/location/user ids are different.
+			if r_json.get("pagination"):
+				if r_json["pagination"].get("min_tag_id"):
+					if r_json["pagination"]["min_tag_id"] > instagram_last_id:
+						instagram_last_tag_id = r_json["pagination"]["min_tag_id"]
+						
+				elif (update["object"] == "geography") and (r_json["pagination"].get("next_min_id")):
+					# Geography 
+					if r_json["pagination"]["next_min_id"] > instagram_last_id:
+						instagram_last_geography_id = r_json["pagination"]["next_min_id"]
 
+			print " --> Last tag id " + instagram_last_id
 
+			ig_posts = r_json["data"]
+			for post in ig_posts:
+			
+				post["post_id"] = post["id"]
+				del post["id"]
+			
+				if not post.get("tags"):
+					post["tags"] = [""]
+			
+				print post["post_id"] + " " + post["tags"][0] + " " + post["created_time"]
+			
+				update_status("Found a new Instragram post by %s" % post["user"]["username"], 1)
 
+				# Set time to human readable and type to the database
+				post["time"] = time.strftime("%D %H:%M", time.localtime(int(post["created_time"])))
+				post["swatsocial_type"] = "Instagram"
+				
+				
+				# Save the Instagram post
+				# Async insert; callback is executed when insert completes
+				#print media.id, media.created_time, media.caption.text, media.user.username, media.filter
+				db.instagram.insert(post)
+				
+				# Send media to template and post it
+				loader = Loader("./templates")
+				msg = {}
+				msg["html"] = loader.load("instagram_message.html").generate(message=post)
 
-
+				# Send the Instagram info to all the clients
+				for waiter in ChatSocketHandler.waiters:
+					try:
+						waiter.write_message(msg)	
+					except:
+						logging.error("Error sending Instrgram message", exc_info=True)
+			
+				# Send Arduino message
+				arduino_url = arduino_ip + "?id=" + str(post["post_id"]) + "&color1=FFFFFF&color2=000000&mode=2"
+				try:
+					print "Sending to Arduino: " + arduino_url
+					r = requests.get(arduino_url, timeout=4)
+		
+				except requests.exceptions.Timeout:
+					print "Arduino request timed out" 
+				
+				except:
+					print "Cannot connect to Arduino"            
 
 
 
@@ -365,7 +385,7 @@ def TwitterListener(message):
 		
 	# Didn't find a screen name match? Look for matches in search terms	
 	if display_mode < 0:
-		tweet_text =  message["text"].lower()
+		tweet_text =  message["text"].lower().encode('utf-8')
 		print tweet_text
 		for key, value in twitter_search_terms.iteritems():
 			#print key.lower()
@@ -457,6 +477,12 @@ def saved_tumblr(result, error):
 
 
 
+def process_instagram_tag_update(update):
+
+	print "Got an instragram update: " + update
+
+
+
 
 
 
@@ -477,7 +503,12 @@ def main():
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
 	#instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
 	#instagram_callback.start()
-
+	#instagram_api.create_subscription(object='tag', object_id='bacon', aspect='media', callback_url='http://23.23.177.220:8008/instagram_subscription')
+	#reactor = subscriptions.SubscriptionsReactor()
+	#reactor.register_callback(subscriptions.SubscriptionType.TAG, process_instagram_tag_update)
+	
+	
+	
 	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
 	#tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
 	#tumblr_callback.start()
@@ -492,6 +523,8 @@ def main():
 	
 	tornado.ioloop.IOLoop.instance().start()
  
+
+
 
 
 
