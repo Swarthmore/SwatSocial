@@ -60,24 +60,41 @@ var updater = {
 	    updater.showMessage(JSON.parse(event.data));
 	}
 	
-	updater.socket.onopen = function(){  
-             $("#inbox").append('<div>Started connection to server.</div>');  
-        }  	
+	updater.socket.onopen = function(){ 
+		// Set unique ID
+		var id = "new_connection_" + new Date().getTime()
+		var now = new Date();
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
+		updater.showMessage( {
+				id: id,
+				html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 150px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Started connection to server.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
+		})
+    }  	
 	
 	updater.socket.onclose = function(){  
-             $("#inbox").append('<div>Connection with server interrupted . . . </div>');  
-             setTimeout(function(){updater.start()}, 5000);
-        }  
+		// Set unique ID
+		var id = "closed_connection_" + new Date().getTime()
+		var now = new Date();
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
+		updater.showMessage( {
+				id: id,
+				html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 150px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Connection with server interrupted.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
+		})
+    }  	
 	
 	
 	
     },
 
     showMessage: function(message) {
+    
+    	// Don't show duplicate messages (compare id's)
         var existing = $("#m" + message.id);
         if (existing.length > 0) return;
+        
         var node = $(message.html);
         node.hide();
+        
         $("#inbox").prepend(node);
         node.slideDown();
     }

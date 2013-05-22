@@ -94,23 +94,23 @@ ig_posts = []
 for document in cursor:
 	print document["id"]
 	ig_posts.append(document)
-	if document["id"] > instagram_last_id:
-		instagram_last_id = document["id"]
+	if document["id"] > instagram_last_tag_id:
+		instagram_last_tag_id = document["id"]
 		instagram_last_location_id = document["id"]
 
 print "----- End of recent tweets"
 
 
 # Get latest instagram posts from the database
-print "----- Looking for recent Instagram posts"
+print "----- Looking for recent Instagram geography posts"
 cursor = db.instagram.find({"created_time":{"$gte": datetime.datetime(2013, 3, 23)}}).sort("id",-1)
 
 ig_posts = []
 for document in cursor:
 	print document["id"]
 	ig_posts.append(document)
-	if document["id"] > instagram_last_id:
-		instagram_last_id = document["id"]
+	if document["id"] > instagram_last_tag_id:
+		instagram_last_tag_id = document["id"]
 		instagram_last_location_id = document["id"]
 
 print "----- End of recent instagram posts"
@@ -199,7 +199,8 @@ class Instagram_Sub(tornado.web.RequestHandler):
 		
 	def post(self):
 	
-		global instagram_last_id
+		global instagram_last_tag_id
+		global instagram_last_geography_id
 	
 		# Figure out what is posted from Instagram
 		x_hub_signature = self.get_argument('X-Hub-Signature', "")
@@ -215,19 +216,19 @@ class Instagram_Sub(tornado.web.RequestHandler):
 			
 			if update["object"] == "tag":
 				# Pull down recent posts with matching tags
-				ig_request_url = "https://api.instagram.com/v1/tags/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_id
+				ig_request_url = "https://api.instagram.com/v1/tags/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_tag_id
 			
 			elif update["object"] == "location":
 				# Pull down recent posts with matching locations
-				ig_request_url = "https://api.instagram.com/v1/locations/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_id=" + instagram_last_id
+				ig_request_url = "https://api.instagram.com/v1/locations/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_id=" + instagram_last_tag_id
 				
 			elif update["object"] == "geography":
 				# Pull down recent posts with matching geographies
-				ig_request_url = "https://api.instagram.com/v1/geographies/" + update["object_id"] + "/media/recent?client_id=" + instagram_client_id + "&min_id=" + instagram_last_id	
+				ig_request_url = "https://api.instagram.com/v1/geographies/" + update["object_id"] + "/media/recent?client_id=" + instagram_client_id + "&min_id=" + instagram_last_geography_id	
 				
 			elif update["object"] == "user":
 				# Pull down recent posts with matching user
-				ig_request_url = "https://api.instagram.com/v1/users/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_id
+				ig_request_url = "https://api.instagram.com/v1/users/" + update["object_id"] + "/media/recent?access_token=" + instagram_access_token + "&min_tag_id=" + instagram_last_tag_id
 				
 			else:
 				# Don't know what to look for
@@ -251,15 +252,17 @@ class Instagram_Sub(tornado.web.RequestHandler):
 			# Note - geography and tag/location/user ids are different.
 			if r_json.get("pagination"):
 				if r_json["pagination"].get("min_tag_id"):
-					if r_json["pagination"]["min_tag_id"] > instagram_last_id:
+					if r_json["pagination"]["min_tag_id"] > instagram_last_tag_id:
 						instagram_last_tag_id = r_json["pagination"]["min_tag_id"]
+					print " --> Last tag id " + instagram_last_tag_id
 						
 				elif (update["object"] == "geography") and (r_json["pagination"].get("next_min_id")):
 					# Geography 
-					if r_json["pagination"]["next_min_id"] > instagram_last_id:
+					if r_json["pagination"]["next_min_id"] > instagram_last_geography_id:
 						instagram_last_geography_id = r_json["pagination"]["next_min_id"]
+					print " --> Last geography id " + instagram_last_geography_id
 
-			print " --> Last tag id " + instagram_last_id
+			
 
 			ig_posts = r_json["data"]
 			for post in ig_posts:
@@ -282,7 +285,7 @@ class Instagram_Sub(tornado.web.RequestHandler):
 				# Save the Instagram post
 				# Async insert; callback is executed when insert completes
 				#print media.id, media.created_time, media.caption.text, media.user.username, media.filter
-				db.instagram.insert(post)
+				db.instagram.save(post)
 				
 				# Send media to template and post it
 				loader = Loader("./templates")
