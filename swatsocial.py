@@ -344,19 +344,26 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
             except:
                 logging.error("Error sending message", exc_info=True)
 
+
     def on_message(self, message):
-        logging.info("got message %r", message)
-        parsed = tornado.escape.json_decode(message)
-        chat = {
-            "id": str(uuid.uuid4()),
-            "body": parsed["body"],
-            }
-        chat["html"] = tornado.escape.to_basestring(
-            self.render_string("message.html", message=chat))
+		logging.info("got message '%r'", message)
+		if message.startswith("heartbeat"):
+			print "Received heartbeat"
+			
+		else:
+			parsed = tornado.escape.json_decode(message)
+			chat = {
+				"id": str(uuid.uuid4()),
+				"body": parsed["body"],
+				}
+			#chat["html"] = tornado.escape.to_basestring(
+			#	self.render_string("message.html", message=chat))
 
-        ChatSocketHandler.update_cache(chat)
-        ChatSocketHandler.send_updates(chat)
-
+			#ChatSocketHandler.update_cache(chat)
+			#ChatSocketHandler.send_updates(chat)
+			
+		#except NotImplementedError:
+		#	update_status("Cannot parse message from client")
 
 
 
@@ -504,13 +511,7 @@ def main():
 	twitter_def_callback.start()
 
 	# Set up Instagram periodic call backs	(convert seconds to milliseconds)
-	#instagram_callback = tornado.ioloop.PeriodicCallback(check_instagram, instagram_check_time*1000)
-	#instagram_callback.start()
 	#instagram_api.create_subscription(object='tag', object_id='bacon', aspect='media', callback_url='http://23.23.177.220:8008/instagram_subscription')
-	#reactor = subscriptions.SubscriptionsReactor()
-	#reactor.register_callback(subscriptions.SubscriptionType.TAG, process_instagram_tag_update)
-	
-	
 	
 	# Set up Tumblr periodic call backs	(convert seconds to milliseconds)
 	#tumblr_callback = tornado.ioloop.PeriodicCallback(check_tumblr, tumblr_check_time*1000)
@@ -577,20 +578,20 @@ def getTwitterSearchTerms():
 		else:
 			twitter_search_terms[row[0]]["mode"] = 0
 
-		# Remove any non-alphanumeric characters from the Twitter tracking terms list
-		twitter_tracking_terms.append(''.join(e for e in row[0] if e.isalnum()))		
+		# Remove any leading @ or # characters from the Twitter tracking terms list
+		tracking_term = row[0]
+		if tracking_term.startswith("#") or tracking_term.startswith("@"): 
+			tracking_term = tracking_term[1:]
+		
+		twitter_tracking_terms.append(tracking_term)		
 
  
 	# Remove any duplicate items from the tracking terms and follows by converting it into a set
 	# Then convert it to a string
 	twitter_tracking_terms =  ','.join(set(twitter_tracking_terms))
 	twitter_follows = ",".join(set(twitter_follows_list))
-
-
+	
 	update_status("Done looking up Twitter definitions", 1)
-
-
-
 
 
 

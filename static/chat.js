@@ -16,86 +16,94 @@ $(document).ready(function() {
     if (!window.console) window.console = {};
     if (!window.console.log) window.console.log = function() {};
 
-    $("#messageform").live("submit", function() {
-        newMessage($(this));
-        return false;
-    });
-    $("#messageform").live("keypress", function(e) {
-        if (e.keyCode == 13) {
-            newMessage($(this));
-            return false;
-        }
-    });
-    $("#message").select();
-    updater.start();
+    start_ws();
 });
 
-function newMessage(form) {
-    var message = form.formToDict();
-    updater.socket.send(JSON.stringify(message));
-    form.find("input[type=text]").val("").select();
-}
- 
-jQuery.fn.formToDict = function() {
-    var fields = this.serializeArray();
-    var json = {}
-    for (var i = 0; i < fields.length; i++) {
-        json[fields[i].name] = fields[i].value;
-    }
-    if (json.next) delete json.next;
-    return json;
-};
 
-var updater = {
-    socket: null,
+var socket;
+var socketTimer;
+var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
 
-    start: function() {
-        var url = "ws://" + location.host + "/chatsocket";
-        if ("WebSocket" in window) {
-	    updater.socket = new WebSocket(url);
-        } else {
-            updater.socket = new MozWebSocket(url);
-        }
-	updater.socket.onmessage = function(event) {
-	    updater.showMessage(JSON.parse(event.data));
+function start_ws() {
+	// Define websocket URL
+	var url = "ws://" + location.host + "/chatsocket";
+	
+	// Create websocket (with FireFox compatbility check)
+	if ("WebSocket" in window) {
+		socket = new WebSocket(url);
+	} else {
+		socket = new MozWebSocket(url);
 	}
 	
-	updater.socket.onopen = function(){ 
+	// On new message, display it
+	socket.onmessage = function(event) {
+		showMessage(JSON.parse(event.data));
+	};
+	
+	// When socket is opened, display notification message
+	socket.onopen = function(){ 
 		// Set unique ID
 		var id = "new_connection_" + new Date().getTime()
 		var now = new Date();
-		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
-		updater.showMessage( {
-				id: id,
-				html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 150px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Started connection to server.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:MM TT');
+		
+		showMessage( {
+			id: id,
+			html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Started connection to server.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
 		})
-    }  	
+		
+		// Turn off automatic attempts to start socket
+		clearInterval(socketTimer);
+		
+		// Replace with heartbeat 
+		socketTimer = setInterval(function() {socket.send('heartbeat');}, ws_heartbeat_interval);
+		
+		
+    }; 	
 	
-	updater.socket.onclose = function(){  
+	// If socket is closed, display notification message
+	socket.onclose = function(){  
 		// Set unique ID
-		var id = "closed_connection_" + new Date().getTime()
+		var id = "connection_closed_" + new Date().getTime()
 		var now = new Date();
 		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
-		updater.showMessage( {
-				id: id,
-				html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 150px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Connection with server interrupted.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
+		showMessage( {
+			id: id,
+			html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Connection with server interrupted.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
 		})
-    }  	
+		
+		// Turn off automatic attempts to send heartbeat
+		clearInterval(socketTimer);		
+		
+		// Keep trying to restart connection
+		socketTimer = setInterval(function(){start_ws()}, 5000);
+		
+    } ; 	
 	
-	
-	
-    },
-
-    showMessage: function(message) {
-    
-    	// Don't show duplicate messages (compare id's)
-        var existing = $("#m" + message.id);
-        if (existing.length > 0) return;
-        
-        var node = $(message.html);
-        node.hide();
-        
-        $("#inbox").prepend(node);
-        node.slideDown();
-    }
+	// If there is a socket error, display a notification message
+	socket.onerror = function(){  
+		// Set unique ID
+		var id = "connection_error_" + new Date().getTime()
+		var now = new Date();
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
+		showMessage( {
+			id: id,
+			html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Websocket error.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
+		})
+    }; 
 };
+	
+
+	
+function showMessage(message) {
+    
+	// Don't show duplicate messages (compare id's)
+	var existing = $("#m" + message.id);
+	if (existing.length > 0) return;
+
+	var node = $(message.html);
+	node.hide();
+
+	$("#inbox").prepend(node);
+	node.slideDown();
+}
