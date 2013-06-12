@@ -31,13 +31,16 @@ Config = ConfigParser.ConfigParser()
 Config.read("swatsocial.conf")
 
 
+
 ### Tornado Configuration ###
 define("port", default=Config.get('app', "port"), help="run on the given port", type=int)
 debug_mode = Config.get('app', "debug_mode")
 
  
+ 
 ### Arduino Configuration ###
 arduino_ip = Config.get('Arduino', "ip_address")
+
 
 
 ### Twitter Configuration ###
@@ -56,11 +59,8 @@ twitter_search_terms = {}
 twitter_definition_refresh = Config.getint('Twitter', "twitter_definition_refresh")
 
 
+
 ### Instagram Configuration ###
-#instagram_api = InstagramAPI(access_token=Config.get('Instagram', "instagram_access_token"), 
-#	client_id=Config.get('Instagram', "instagram_client_id"), 
-#	client_secret=Config.get('Instagram', "instagram_client_secret"))
-	 
 instagram_last_location_id = 0
 instagram_last_tag_id = "0"
 instagram_last_geography_id = "0"
@@ -69,6 +69,8 @@ instagram_client_secret = Config.get('Instagram', "instagram_client_secret")
 instagram_access_token = Config.get('Instagram', "instagram_access_token")
 instagram_client_id = Config.get('Instagram', "instagram_client_id")
 
+
+
 ### Tumblr Configuration ###
 tumblr_api_url = Config.get('Tumblr', "tumblr_api_url")	
 tumblr_api_key = Config.get('Tumblr', "tumblr_api_key")	
@@ -76,14 +78,16 @@ tumblr_check_time = Config.getint('Tumblr', "tumblr_check_time")
 tumblr_last_id = 0
 
 
+
 ### Database Configuration ###
 client = MongoClient(Config.get('DB', "db_host"), 27017)
 db = client[Config.get('DB', "db_name")]
 
+
+
 ### Set time zone ###
 os.environ['TZ'] = 'America/New_York'
 time.tzset()
-
 
 
 # Get latest Tweets posts from the database
@@ -172,6 +176,9 @@ def check_tumblr():
 					waiter.write_message(post)	
 				except:
 					logging.error("Error sending Tumblr message", exc_info=True)	
+					
+			# Insert Tumblr post to database	
+			db.posts.insert({'type':'tumblr','data':post})		
 
 	# Record the highest post id
 	for post in posts["response"]:
@@ -185,8 +192,9 @@ def check_tumblr():
 class MainHandler(tornado.web.RequestHandler):
 	def get(self):
 		self.render("index.html", messages=ChatSocketHandler.cache)
+		
 
-
+			
 
 
 class Instagram_Sub(tornado.web.RequestHandler):
@@ -309,7 +317,10 @@ class Instagram_Sub(tornado.web.RequestHandler):
 					print "Arduino request timed out" 
 				
 				except:
-					print "Cannot connect to Arduino"            
+					print "Cannot connect to Arduino"     
+					
+				# Insert Instagram post to database	
+				db.posts.insert({'type':'instagram','data':post})	       
 
 
 
@@ -349,7 +360,29 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
 		logging.info("got message '%r'", message)
 		if message.startswith("heartbeat"):
 			print "Received heartbeat"
-			
+		
+		elif message.startswith("get_history"):
+			cursor = db.posts.find(limit=10).sort("_id",-1)
+			for document in cursor:
+				loader = Loader("./templates")
+		
+				msg = {}
+				if document["type"] == "instagram":
+					msg["html"] = loader.load("instagram_message.html").generate(message=document["data"])
+				elif document["type"] == "tweet":
+					msg["html"] = loader.load("tweet_message.html").generate(message=document["data"])
+				elif document["type"] == "tumblr":
+					msg["html"] = 	loader.load("tumblr_message.html").generate(message=document["data"])
+				else:
+					msg["html"] = ""
+					
+				# Send the history
+				#for waiter in ChatSocketHandler.waiters:
+				try:
+					self.write_message(msg)	
+				except:
+					logging.error("Error sending history", exc_info=True)
+		
 		else:
 			parsed = tornado.escape.json_decode(message)
 			chat = {
@@ -435,12 +468,7 @@ def TwitterListener(message):
 	
 
 	loader = Loader("./templates")
-	tweet["html"] = loader.load("tweet_message.html").generate(tweet=tweet)
-
-	# Save the tweet
-	# Async insert; callback is executed when insert completes
-   	#db.tweets.insert({'tweet':tweet}, callback=saved_tweet)
-	
+	tweet["html"] = loader.load("tweet_message.html").generate(message=tweet)
 	  
 	# Send the Twitter info to all the clients
 	for waiter in ChatSocketHandler.waiters:
@@ -462,37 +490,14 @@ def TwitterListener(message):
 	except:
 		print "Cannot connect to Arduino"            
 
-
- 
-def saved_tweet(result, error):
-	if error:
-		update_status("Could not save Tweet to database: %s" % error, 1)
-	else:
-		update_status("Tweet saved to database", 1)
-	
-
-def saved_instagram(result, error):
-	if error:
-		update_status("Could not save Instagram to database: %s" % error, 1)
-	else:
-		update_status("Instagram saved to database", 1)
-
-def saved_tumblr(result, error):
-	if error:
-		update_status("Could not save Tumblr postto database: %s" % error, 1)
-	else:
-		update_status("Tumblr post saved to database", 1)
-
+	# Save the tweet
+   	db.posts.insert({'type':'tweet','data':tweet})
 
 
 
 
 def process_instagram_tag_update(update):
-
 	print "Got an instragram update: " + update
-
-
-
 
 
 
@@ -525,7 +530,7 @@ def main():
 	app = Application()
 	app.listen(options.port)
 	
-	tornado.ioloop.IOLoop.instance().start()
+	io_loop = tornado.ioloop.IOLoop.instance().start()
  
 
 

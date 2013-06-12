@@ -58,6 +58,9 @@ function start_ws() {
 		// Replace with heartbeat 
 		socketTimer = setInterval(function() {socket.send('heartbeat');}, ws_heartbeat_interval);
 		
+		// Get recent history
+		socket.send('get_history');
+		
 		
     }; 	
 	
@@ -66,7 +69,7 @@ function start_ws() {
 		// Set unique ID
 		var id = "connection_closed_" + new Date().getTime()
 		var now = new Date();
-		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:MM TT');
 		showMessage( {
 			id: id,
 			html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Connection with server interrupted.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
@@ -85,7 +88,7 @@ function start_ws() {
 		// Set unique ID
 		var id = "connection_error_" + new Date().getTime()
 		var now = new Date();
-		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:mm TT');
+		var formattedDate = dateFormat(now, 'mm/dd/yyyy hh:MM TT');
 		showMessage( {
 			id: id,
 			html: "<div class=\"message\" id=\"" + id + "\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">Websocket error.</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">" + formattedDate + "</div></div>"
