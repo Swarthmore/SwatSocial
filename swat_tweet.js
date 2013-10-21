@@ -1,0 +1,259 @@
+var arduino = require("./swat_arduino");
+
+var connect_to_twitter = function (config, callback) {
+	var err;	
+	twit = new twitter({
+		consumer_key: config.Twitter.twitter_consumer_key,
+		consumer_secret: config.Twitter.twitter_consumer_secret,
+		access_token_key: config.Twitter.twitter_access_token,
+		access_token_secret: config.Twitter.twitter_access_token_secret
+	});   
+
+	callback(err, twit);
+}
+
+
+
+
+
+var load_Twitter_search_terms = function(config, callback) {
+	
+	console.log("\nConnecting to Google Doc\n-----------------------------");
+
+	var my_sheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
+	my_sheet.getRows( 1, function(err, row_data){
+	
+	 	my_sheet.getInfo( function( err, sheet_info ){
+	 		if (err) {
+	 			console.log(err);
+	 			return;
+	 		} else {
+        	console.log( sheet_info.title + ' is loaded' );
+        	}
+        });
+	
+		console.log( 'Found '+row_data.length + ' rows in Google Doc');
+		
+		config.twitter_tracking_terms = [];
+		config.twitter_follow_ids = [];
+		config.twitter_defs = [];
+		
+		
+		// Add term to twitter tracking list.  If the term starts with @ or #, drop it.
+		row_data.forEach(function(row) {
+			
+			if (row.term.charAt(0)=="@" || row.term.charAt(0)=="#" ) {
+				config.twitter_tracking_terms.push(row.term.substr(1));
+			} else {
+				config.twitter_tracking_terms.push(row.term);
+			}	
+			
+			// Look for Twitter user ID's to follow (not google-spreadsheet drops non-alphanumeric characters in column names)
+			if (row.userid) {
+				config.twitter_follow_ids.push(row.userid);	
+			}	
+			
+			// Store the entire search term row (up through the first 5 rows) to match terms, colors, and Arduino modes
+			config.twitter_defs.push(row);	
+			
+		});
+				
+		console.log("\nTwitter Tracking terms:\n-----------------------------\n" + config.twitter_tracking_terms);
+		console.log("\nTwitter Follow IDs:\n-----------------------------\n" + config.twitter_follow_ids);
+	
+		callback(null,config);
+		
+	})
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+// Begin tracking twitter search terms, users, and locations
+
+var start_tracking_Twitter_terms = function(config, callback) {
+
+
+
+	console.log("Setting up tracking terms for Twitter.");
+
+	if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.destroy;} // Destroy any existing streams
+	twit.stream('statuses/filter', {
+			'track':config.twitter_tracking_terms.join(','), 
+			'locations':'-75.359216,39.898439,-75.350075,39.909144',
+			'follow': config.twitter_follow_ids.join(',')
+			},
+			
+		function(stream) {
+		
+			stream.on('error', function(error, code) {
+				console.log("Error setting up Twitter stream: " + error + ": " + code);
+			});
+		
+      		stream.on('data', function(data) {tweet_handler(data, config);});
+       	}
+    );
+    
+    callback(null,config);
+
+}
+
+
+
+
+
+
+
+
+// Given a tweet, see if it matches search terms, users, or locations and (if it does) send it out to any listeners
+
+var tweet_handler = function(tweet, config) {
+
+		// Make sure this is a valid tweet: 
+		//if (typeof tweet.text == 'undefined' || tweet.text == null) {return;} else {console.log(tweet);}
+		console.log("\nGot a tweet: " + tweet.text);
+		
+		var output = {};
+		output.content = tweet;
+		output.id = tweet.id;
+		output.type = "tweet";
+		output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
+		output.matches = [];
+		
+		
+		// Figure out which search term it matches
+		// Loop through all the terms set up in the Google Doc looking for a match
+		config.twitter_defs.every(function(r, index, array) {
+		
+			// Remove @ and # from start of search term
+			var term = (r.term.charAt(0)=="@" || r.term.charAt(0)=="#" ? r.term.substr(1) : r.term)
+			
+			// Look for a user match
+			if (tweet.user.id == r.userid) {
+				console.log("Matched user: " + r.term);
+					
+				var match = {
+					matchtype: "User",
+					match: r.term,
+					color1:  r.color1,
+					color2:  r.color2,
+					display_mode: r.displaymode
+				}				
+				output.matches.push(match);
+			}		
+
+				
+			// See if it matched a search term	
+			if (tweet.text.toLowerCase().indexOf(term) != -1) {
+						
+				console.log("Matched search term: " + term);
+				
+				var match = {
+					matchtype: "Term",
+					match: r.term,
+					color1:  r.color1,
+					color2: r.color2,
+					display_mode: r.displaymode
+				}				
+				output.matches.push(match);
+			}	
+			
+			
+				// See if there is a search term match in a URL
+			if (typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(term) != -1) {
+								
+				console.log("Matched search term " + term + " in URL:");
+				console.log(tweet.entities.urls);
+						
+				var url_match = _und.pluck(tweet.entities.urls, 'expanded_url').join();		
+						
+				var match = {
+					matchtype: "URL",
+					match: "<a href=\"" + url_match + "\" target=\"_blank\">" + url_match + "</a>",
+					color1:  r.color1,
+					color2:  r.color2,
+					display_mode: r.displaymode
+				}				
+				output.matches.push(match);							
+			}		
+			
+			return true;	
+		}); // End of loop through Twitter search terms, users definitions, and URLs
+			
+		// See it if matched our location
+		if (typeof tweet.coordinates!='undefined' && tweet.coordinates !== null && tweet.coordinates.coordinates[0] <= -75.350075 &&  tweet.coordinates.coordinates[0] >=-75.359216 &&  tweet.coordinates.coordinates[1] >= 39.898439 &&  tweet.coordinates.coordinates[1] <= 39.909144) {
+		
+			console.log("Matched location: " + tweet.coordinates.coordinates);
+		
+			var match = {
+				matchtype: "Location",
+				match: tweet.coordinates.coordinates.join(),
+				color1:  "FF0000",
+				color2:  "A00000",
+				display_mode: "party_mode"
+			}				
+			output.matches.push(match);
+		}					
+			
+				
+
+			
+		// Did we find a match?  If so, send it to the listeners
+		if (output.matches.length > 0) {
+		
+			// First replace any URLs in the text with links to the URL
+			output.content.entities.urls.every(function(element, index, array) {
+				console.log("Found a URL: " + element.url);
+				output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.url + "\" target=\"_blank\">" + element.url + "</a>");
+			});
+			
+	
+			console.log("Tweet send out");
+			io.sockets.emit('twitter',output);		
+			
+			// Save Tweet to database
+			config.db.collection('posts').insert(output, function(err, docs) {
+				if (err) {
+					console.log("Error saving tweet to database: " + err);
+				} else {
+					console.log("Saved tweet to database");
+				}
+			});
+
+			// Flash lights on Arduino based on first matched attribute
+			var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
+			arduino.send_arduino_message(config, output.id, output.matches[0].color1, output.matches[0].color2, display);
+						
+		} else {
+			console.log("Did not match anything -- not displaying");
+			
+			if (typeof tweet.place!='undefined' && tweet.place !== null &&
+				(tweet.place.name == "New Jersey" || tweet.place.name == "Pennsylvania" || tweet.place.full_name.indexOf(", PA") != -1)) {
+				console.log("Probably because place is PA or NJ");
+			} else {
+				console.log(tweet);
+				console.log("--------------\n\n");
+			}
+		}
+
+} // End of tweet_handler
+
+
+
+
+
+
+
+
+exports.connect_to_twitter = connect_to_twitter;
+exports.load_Twitter_search_terms = load_Twitter_search_terms;
+exports.start_tracking_Twitter_terms = start_tracking_Twitter_terms;
+exports.tweet_handler = tweet_handler;

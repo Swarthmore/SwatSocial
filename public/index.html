@@ -1,0 +1,126 @@
+<html>
+<head>
+	<title>SwatSocial</title>
+	<link rel="stylesheet" type="text/css" href="/css/swatsocial.css">
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+	<script src="/js/mustache.js"></script>
+	<script src="/js/date.format.js"></script>
+</head>
+<body>
+
+
+
+<button onClick="javascript:reload_search_terms();">Reload Config</button>
+<button onClick="javascript:load_last_posts();">Load Last Posts</button>
+<div id="inbox" style="overflow: auto;"></div>
+
+
+
+<script type="text/javascript">
+
+	var tweet_template = ""
+	var socket;
+
+	$(document).ready(function() {
+		
+		// Load the HTML templates
+		$.get('/template/tweet_template.html', function(data){tweet_template = data;});	
+
+		start_ws();		// Start web sockets
+	
+	});
+
+
+	function reload_search_terms() {
+		socket.emit('reload_search_terms', {});
+	}
+
+	function load_last_posts() {
+		socket.emit('load_history', {});
+	}
+
+
+	function start_ws() {
+		socket = io.connect('http://23.23.177.220:8008');
+		var socketTimer;
+		var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
+		
+		
+		
+		var status_template = "<div class=\"message\" id=\"{{ id }}\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">{{ message }}</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">{{ formattedDate }}</div></div>"
+		
+	
+		socket.on('twitter', function(data) {
+			console.debug(data);
+			showMessage(data, tweet_template);
+			$("#" + data.id + "_source:first").html($("#" + data.id + "_source:first").text());  // Strip links from Tweet source
+			
+		});
+	
+		// When socket is opened, display notification message
+		socket.on('connect', function() { 
+			
+			var data = {};
+			data.id = "new_connection_" + new Date().getTime()		// Set unique ID
+			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.message = "Started connection to server.";
+			showMessage(data, status_template);
+		
+			// Turn off automatic attempts to start socket
+			clearInterval(socketTimer);
+		
+			// Replace with heartbeat 
+			socketTimer = setInterval(function() {socket.send('heartbeat');}, ws_heartbeat_interval);
+		
+			// Get recent history
+			socket.send('get_history');
+		}); // End of socket open routine 	
+
+		// If socket is closed, display notification message
+		socket.on('disconnect', function() {  
+		
+			var data = {};
+			data.id = "closed_connection_" + new Date().getTime()		// Set unique ID
+			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.message = "Connection with server interrupted.";
+			showMessage(data, status_template);
+		
+			// Turn off automatic attempts to send heartbeat
+			clearInterval(socketTimer);		
+		
+			// Keep trying to restart connection
+			socketTimer = setInterval(function(){start_ws()}, 5000);
+		});  // End of socket close	
+	
+		// If there is a socket error, display a notification message
+		socket.on("error", function() {  
+		
+			var data = {};
+			data.id = "connection_error_" + new Date().getTime()		// Set unique ID
+			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.message = "Websocket error.";
+			showMessage(data, status_template);
+		
+		}); // End of socket on error
+	} // end of start_ws
+	
+
+	
+	function showMessage(message, template) {
+	
+		// Don't show duplicate messages (compare id's)
+		var existing = $("#" + message.id);
+		if (existing.length > 0) return;
+		
+		$(Mustache.render(template, message)).prependTo("#inbox").hide().slideDown();
+	}
+
+
+</script>
+
+
+
+
+</body>
+</html>
