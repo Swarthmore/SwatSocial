@@ -1,11 +1,19 @@
-<div class='message twitter' id='<%= content.id %>' style='position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #555555>'> 
+<div class='message twitter' id='<%= _id %>' style='position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #555555>'> 
 		
 	<div style="position:relative;float:left;height:90px;">
 		<img style='position:relative;float:left;clear:right;width:73px;height:73px' src='<%= content.user.profile_image_url %>'> <BR>
 		<img style='float:left;' src='/img/twitter_icon.png' > 
 	</div>
 	
-	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'><%= formatted_time %></div>
+	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'>
+		<%= formatted_time %><BR>
+		From 
+		<%
+			// Strip any HTML formatting
+			var source = $('<div>' + content.source + '</div>').text();	
+			print(source);	
+		%>
+	</div>
 	
 	
 	
@@ -71,13 +79,9 @@
 	</div> 
 	
 	
-	<div style='position:absolute;bottom:3px;right:5px;width:50%;font-size:50%;text-align:right'>From 
+	<div style='position:absolute;bottom:3px;right:5px;width:50%;font-size:50%;text-align:right'> 
 	
-		<%
-			// Strip any HTML formatting
-			var source = $('<div>' + content.source + '</div>').text();	
-			print(source);	
-		%>
+
 	</div>
 	
 </div>

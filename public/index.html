@@ -1,4 +1,4 @@
-<html>
+<!DOCTYPE html>
 <head>
 	<title>SwatSocial</title>
 	<link rel="stylesheet" type="text/css" href="/css/swatsocial.css">
@@ -7,8 +7,6 @@
 	<script src="/js/mustache.js"></script>
 	<script src="/js/date.format.js"></script>
 	<script src="/js/underscore-min.js"></script>
-	
-
 </head>
 <body>
 
@@ -22,22 +20,43 @@
 
 <script type="text/javascript">
 
-	var tweet_template;
-	var instagram_template;
-	var socket;
+var tweet_template;
+var instagram_template;
+var socket;
 
-	$(document).ready(function() {
-		
-		// Load the HTML templates
-		//$.get('/template/tweet_template.html', function(data){tweet_template = data;});	
-		
-		//$.get('/template/_tweet_template.html', function(data){tweet_template=_.template(data);});	
-		
-		//$.get('/template/_instagram_template.html', function(data) {instagram_template = _.template(data);});	
+$(document).ready(function() {
+	start_ws();		// Start web sockets	
+});
 
-		start_ws();		// Start web sockets
+infinite_scroll = _.debounce(function() {
+		
+			console.log("Fetch more data!");
+		
+			// Get the last item in the inbox. 
+			last_id = $("#inbox .message").not(".status" ).last().attr("id"); 
+		
+			// Load older posts
+			load_previous_posts(last_id);
+		
+		}, 100, true);	
+		
 	
-	});
+
+
+//window.addEventListener("scroll", infinite_scroll);
+
+$(window).scroll( function() {
+	console.log($(window).scrollTop(), $(document).height(), $(window).height());
+
+if( $(window).scrollTop() > $(document).height() - $(window).height() -50 ) {
+
+	console.log("Call infinite scroll");
+	infinite_scroll();
+	}
+	
+});
+	
+	
 
 
 
@@ -76,6 +95,11 @@ function render(tmpl_name, tmpl_data) {
 		socket.emit('load_history', {});
 	}
 
+	function load_previous_posts(last_id) {
+		socket.emit('load_previous_posts', {id:last_id, limit:10});
+	}
+
+
 
 	function start_ws() {
 	/*
@@ -83,21 +107,24 @@ function render(tmpl_name, tmpl_data) {
 			console.log("Waiting");
 		}
 	*/
-		socket = io.connect('http://23.23.177.220:8008');
+		socket = io.connect('http://23.23.177.220');
 		var socketTimer;
 		var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
-		
-		
-		
-		var status_template = "<div class=\"message\" id=\"{{ id }}\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">{{ message }}</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">{{ formattedDate }}</div></div>"
-		
+				
 	
 		socket.on('tweet', function(data) {
 			console.debug(data);
 			showMessage(data, '_tweet_template');
 			$("#" + data.id + "_source:first").html($("#" + data.id + "_source:first").text());  // Strip links from Tweet source
-			
 		});
+
+		socket.on('tweet_previous', function(data) {
+			console.debug("Got an old Tweet");
+			console.debug(data);
+			showPreviousMessage(data, '_tweet_template');
+			$("#" + data.id + "_source:first").html($("#" + data.id + "_source:first").text());  // Strip links from Tweet source
+		});
+
 
 		socket.on('instagram', function(data) {
 			console.debug(data);
@@ -109,9 +136,9 @@ function render(tmpl_name, tmpl_data) {
 			
 			var data = {};
 			data.id = "new_connection_" + new Date().getTime()		// Set unique ID
-			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
 			data.message = "Started connection to server.";
-			showMessage(data, status_template);
+			showMessage(data, "status_template");
 		
 			// Turn off automatic attempts to start socket
 			clearInterval(socketTimer);
@@ -121,6 +148,7 @@ function render(tmpl_name, tmpl_data) {
 		
 			// Get recent history
 			socket.send('get_history');
+			
 		}); // End of socket open routine 	
 
 		// If socket is closed, display notification message
@@ -128,9 +156,9 @@ function render(tmpl_name, tmpl_data) {
 		
 			var data = {};
 			data.id = "closed_connection_" + new Date().getTime()		// Set unique ID
-			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
 			data.message = "Connection with server interrupted.";
-			showMessage(data, status_template);
+			showMessage(data, "status_template");
 		
 			// Turn off automatic attempts to send heartbeat
 			clearInterval(socketTimer);		
@@ -144,27 +172,33 @@ function render(tmpl_name, tmpl_data) {
 		
 			var data = {};
 			data.id = "connection_error_" + new Date().getTime()		// Set unique ID
-			data.formattedDate = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
 			data.message = "Websocket error.";
-			showMessage(data, status_template);
+			showMessage(data, "status_template");
 		
 		}); // End of socket on error
 	} // end of start_ws
 	
 
 	
-	function showMessage(message, template) {
-	
+	function showMessage(message, template) {	
 		// Don't show duplicate messages (compare id's)
 		var existing = $("#" + message.id);
 		if (existing.length > 0) return;
 		var m = render(template, message);
 		$(m).prependTo("#inbox").hide().slideDown();
-		
-
-		//$(Mustache.render(template, message)).prependTo("#inbox").hide().slideDown();
 	}
 
+
+	function showPreviousMessage(message, template) {	
+		// Don't show duplicate messages (compare id's)
+		var existing = $("#" + message.id);
+		if (existing.length > 0) return;
+		var m = render(template, message);
+		$(m).appendTo("#inbox").hide().slideDown();
+	}
+	
+	
 
 </script>
 

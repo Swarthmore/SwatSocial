@@ -119,7 +119,7 @@ var start_tracking_Twitter_terms = function(config, callback) {
 var tweet_handler = function(tweet, config) {
 
 		// Make sure this is a valid tweet: 
-		//if (typeof tweet.text == 'undefined' || tweet.text == null) {return;} else {utility.update_status(tweet);}
+		if (typeof tweet === 'undefined' || typeof tweet.text == 'undefined' || tweet.text == null) {return;}
 		utility.update_status("Got a tweet: " + tweet.text);
 		
 		var output = {};

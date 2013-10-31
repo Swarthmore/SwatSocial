@@ -14,21 +14,23 @@ var http = require('http'),
   	moment = require('moment');
   	swat_tweet = require("./swat_tweet"),
   	swat_instagram = require("./swat_instagram"),
-  	MongoClient = require('mongodb').MongoClient,
+  	mongo = require('mongodb'),
   	format = require('util').format,
   	utility = require("./utility");
 
 var twit;
 var config;
+var fileserver;
 
+
+var MongoClient = mongo.MongoClient;
+var BSON = mongo.BSONPure;
 
 var CONFIG_FILE = './swatsocial.conf';
 
 
 
 io.set('log level', 2); // reduce logging
-var fileServer = new static.Server('./public', { cache: 1 });
-app.listen(8008);
 load_config();
 
 
@@ -37,6 +39,11 @@ function load_config() {
 		function(callback) {
 			load_config_file(CONFIG_FILE, callback);
 		}, 
+		
+		function(callback) {
+			start_server(config, callback);
+		}, 
+
 	
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
@@ -64,6 +71,13 @@ function load_config_file(config_file, callback) {
 		utility.update_status("Opened config file");
 		callback(err, config);
 	});
+}
+
+function start_server(config_file, callback) {
+	fileServer = new static.Server('./public', { cache: 1 });
+	app.listen(config.app.port);
+	utility.update_status("Started server");
+	callback(null, config);
 }
 
 
@@ -161,6 +175,16 @@ io.sockets.on('connection', function(socket) {
 				socket.emit(post.type, post);	
 			});
 	});		
+
+	socket.on('load_previous_posts', function (data) {
+		utility.update_status("Client requested " + data.limit + " previous posts, starting from " + data.id);
+			// Send previous posts to client
+			previous_posts(data, function(post) {
+				post.type += "_previous";
+				socket.emit(post.type, post);	
+			});
+	});	
+
 		
 		
 	socket.on('reload_search_terms', function (data) {
@@ -187,6 +211,22 @@ function last_posts(n, callback) {
 
 }
 
+
+
+
+// Get the last n posts
+function previous_posts(data, callback) {
+
+	utility.update_status("Retrieving " + data.limit + " posts, starting at post ID "  + data.id);
+	var o_id = new BSON.ObjectID(data.id);
+	config.db.collection('posts').find({ _id: { $lt: o_id } }).sort({_id:-1}).limit(data.limit).toArray(
+	function(err, docs) {
+		docs.forEach(function(doc) {
+			callback(doc);
+		});
+    });
+
+}
 
 
 
