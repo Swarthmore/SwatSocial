@@ -1,0 +1,18 @@
+<div class='message instagram' id='{{ content.id }}' style='position:relative;min-height: 200px;background-color:#eeeeee;border:3px solid #{{ config.twittercolorhexcode }}'> 
+	<img style='float:right;' src='/img/instagram_icon.png' > 
+	<img style='position:relative;float:left;width:73px;height:73px' src='{{content.user.profile_picture}}'> 
+	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
+		<b>{{ content.user.full_name }}</b><BR> 
+		<table style="border:0;width:100%">
+		<tr><td style="width:150px">
+			<img style="height:150px;width150px;float:left;padding-right:8px;" src="{{ content.images.thumbnail.url }}">
+		</td><td style="font-size:150%;text-align:left;vertical-align:top;word-wrap: break-word;">
+			{{{ content.caption.text }}}<BR>
+			<span id="{{ content.id }}_source" style='font-size: 50%'>{{ content.filter }}</span>
+			{{#tags}}
+				<span >{{.}} &nbsp;</span>
+			{{/tags}}
+		</td></tr></table>
+	</div> 
+	<div style='position:absolute;bottom:0;right:0;width:50%%;font-size:50%%;text-align:right'>{{ formatted_time }}</div>
+</div>

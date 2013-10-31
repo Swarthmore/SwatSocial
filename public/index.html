@@ -6,6 +6,9 @@
 	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
 	<script src="/js/mustache.js"></script>
 	<script src="/js/date.format.js"></script>
+	<script src="/js/underscore-min.js"></script>
+	
+
 </head>
 <body>
 
@@ -19,17 +22,50 @@
 
 <script type="text/javascript">
 
-	var tweet_template = ""
+	var tweet_template;
+	var instagram_template;
 	var socket;
 
 	$(document).ready(function() {
 		
 		// Load the HTML templates
-		$.get('/template/tweet_template.html', function(data){tweet_template = data;});	
+		//$.get('/template/tweet_template.html', function(data){tweet_template = data;});	
+		
+		//$.get('/template/_tweet_template.html', function(data){tweet_template=_.template(data);});	
+		
+		//$.get('/template/_instagram_template.html', function(data) {instagram_template = _.template(data);});	
 
 		start_ws();		// Start web sockets
 	
 	});
+
+
+
+function render(tmpl_name, tmpl_data) {
+    if ( !render.tmpl_cache ) { 
+        render.tmpl_cache = {};
+    }
+
+    if ( ! render.tmpl_cache[tmpl_name] ) {
+        var tmpl_dir = '/template';
+        var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
+
+        var tmpl_string;
+        $.ajax({
+            url: tmpl_url,
+            method: 'GET',
+            async: false,
+            success: function(data) {
+                tmpl_string = data;
+            }
+        });
+
+        render.tmpl_cache[tmpl_name] = _.template(tmpl_string);
+    }
+
+    return render.tmpl_cache[tmpl_name](tmpl_data);
+}
+
 
 
 	function reload_search_terms() {
@@ -42,6 +78,11 @@
 
 
 	function start_ws() {
+	/*
+		while(typeof tweet_template != undefined) {
+			console.log("Waiting");
+		}
+	*/
 		socket = io.connect('http://23.23.177.220:8008');
 		var socketTimer;
 		var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
@@ -51,11 +92,16 @@
 		var status_template = "<div class=\"message\" id=\"{{ id }}\" style=\"position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000\"><div style=\"position:relative;margin-left:10px;font-size:75%\">{{ message }}</div><div style=\"position:absolute;bottom:0;right:0;width:50%;font-size:50%;text-align:right\">{{ formattedDate }}</div></div>"
 		
 	
-		socket.on('twitter', function(data) {
+		socket.on('tweet', function(data) {
 			console.debug(data);
-			showMessage(data, tweet_template);
+			showMessage(data, '_tweet_template');
 			$("#" + data.id + "_source:first").html($("#" + data.id + "_source:first").text());  // Strip links from Tweet source
 			
+		});
+
+		socket.on('instagram', function(data) {
+			console.debug(data);
+			showMessage(data, "_instagram_template");
 		});
 	
 		// When socket is opened, display notification message
@@ -112,8 +158,11 @@
 		// Don't show duplicate messages (compare id's)
 		var existing = $("#" + message.id);
 		if (existing.length > 0) return;
+		var m = render(template, message);
+		$(m).prependTo("#inbox").hide().slideDown();
 		
-		$(Mustache.render(template, message)).prependTo("#inbox").hide().slideDown();
+
+		//$(Mustache.render(template, message)).prependTo("#inbox").hide().slideDown();
 	}
 
 

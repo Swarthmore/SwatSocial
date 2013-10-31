@@ -1,4 +1,5 @@
-var arduino = require("./swat_arduino");
+var arduino = require("./swat_arduino"),
+	utility = require("./utility");
 
 var connect_to_twitter = function (config, callback) {
 	var err;	
@@ -18,21 +19,21 @@ var connect_to_twitter = function (config, callback) {
 
 var load_Twitter_search_terms = function(config, callback) {
 	
-	console.log("\nConnecting to Google Doc\n-----------------------------");
+	utility.update_status("Connecting to Google Doc for Twitter search terms");
 
 	var my_sheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
 	my_sheet.getRows( 1, function(err, row_data){
 	
 	 	my_sheet.getInfo( function( err, sheet_info ){
 	 		if (err) {
-	 			console.log(err);
+	 			utility.update_status(err);
 	 			return;
 	 		} else {
-        	console.log( sheet_info.title + ' is loaded' );
+        	utility.update_status( sheet_info.title + ' is loaded' );
         	}
         });
 	
-		console.log( 'Found '+row_data.length + ' rows in Google Doc');
+		utility.update_status( 'Found '+row_data.length + ' rows in Google Doc');
 		
 		config.twitter_tracking_terms = [];
 		config.twitter_follow_ids = [];
@@ -58,8 +59,8 @@ var load_Twitter_search_terms = function(config, callback) {
 			
 		});
 				
-		console.log("\nTwitter Tracking terms:\n-----------------------------\n" + config.twitter_tracking_terms);
-		console.log("\nTwitter Follow IDs:\n-----------------------------\n" + config.twitter_follow_ids);
+		utility.update_status("Twitter Tracking terms:\n" + config.twitter_tracking_terms);
+		utility.update_status("Twitter Follow IDs:\n" + config.twitter_follow_ids);
 	
 		callback(null,config);
 		
@@ -83,7 +84,7 @@ var start_tracking_Twitter_terms = function(config, callback) {
 
 
 
-	console.log("Setting up tracking terms for Twitter.");
+	utility.update_status("Setting up tracking terms for Twitter.");
 
 	if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.destroy;} // Destroy any existing streams
 	twit.stream('statuses/filter', {
@@ -95,7 +96,7 @@ var start_tracking_Twitter_terms = function(config, callback) {
 		function(stream) {
 		
 			stream.on('error', function(error, code) {
-				console.log("Error setting up Twitter stream: " + error + ": " + code);
+				utility.update_status("Error setting up Twitter stream: " + error + ": " + code);
 			});
 		
       		stream.on('data', function(data) {tweet_handler(data, config);});
@@ -118,8 +119,8 @@ var start_tracking_Twitter_terms = function(config, callback) {
 var tweet_handler = function(tweet, config) {
 
 		// Make sure this is a valid tweet: 
-		//if (typeof tweet.text == 'undefined' || tweet.text == null) {return;} else {console.log(tweet);}
-		console.log("\nGot a tweet: " + tweet.text);
+		//if (typeof tweet.text == 'undefined' || tweet.text == null) {return;} else {utility.update_status(tweet);}
+		utility.update_status("Got a tweet: " + tweet.text);
 		
 		var output = {};
 		output.content = tweet;
@@ -138,7 +139,7 @@ var tweet_handler = function(tweet, config) {
 			
 			// Look for a user match
 			if (tweet.user.id == r.userid) {
-				console.log("Matched user: " + r.term);
+				utility.update_status("Matched user: " + r.term);
 					
 				var match = {
 					matchtype: "User",
@@ -154,7 +155,7 @@ var tweet_handler = function(tweet, config) {
 			// See if it matched a search term	
 			if (tweet.text.toLowerCase().indexOf(term) != -1) {
 						
-				console.log("Matched search term: " + term);
+				utility.update_status("Matched search term: " + term);
 				
 				var match = {
 					matchtype: "Term",
@@ -170,14 +171,14 @@ var tweet_handler = function(tweet, config) {
 				// See if there is a search term match in a URL
 			if (typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(term) != -1) {
 								
-				console.log("Matched search term " + term + " in URL:");
-				console.log(tweet.entities.urls);
+				utility.update_status("Matched search term " + term + " in URL:");
+				utility.update_status(tweet.entities.urls);
 						
 				var url_match = _und.pluck(tweet.entities.urls, 'expanded_url').join();		
 						
 				var match = {
 					matchtype: "URL",
-					match: "<a href=\"" + url_match + "\" target=\"_blank\">" + url_match + "</a>",
+					match: url_match,
 					color1:  r.color1,
 					color2:  r.color2,
 					display_mode: r.displaymode
@@ -191,7 +192,7 @@ var tweet_handler = function(tweet, config) {
 		// See it if matched our location
 		if (typeof tweet.coordinates!='undefined' && tweet.coordinates !== null && tweet.coordinates.coordinates[0] <= -75.350075 &&  tweet.coordinates.coordinates[0] >=-75.359216 &&  tweet.coordinates.coordinates[1] >= 39.898439 &&  tweet.coordinates.coordinates[1] <= 39.909144) {
 		
-			console.log("Matched location: " + tweet.coordinates.coordinates);
+			utility.update_status("Matched location: " + tweet.coordinates.coordinates);
 		
 			var match = {
 				matchtype: "Location",
@@ -211,20 +212,20 @@ var tweet_handler = function(tweet, config) {
 		
 			// First replace any URLs in the text with links to the URL
 			output.content.entities.urls.every(function(element, index, array) {
-				console.log("Found a URL: " + element.url);
+				utility.update_status("Found a URL: " + element.url);
 				output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.url + "\" target=\"_blank\">" + element.url + "</a>");
 			});
 			
 	
-			console.log("Tweet send out");
-			io.sockets.emit('twitter',output);		
+			utility.update_status("Tweet send out");
+			io.sockets.emit('tweet',output);		
 			
 			// Save Tweet to database
 			config.db.collection('posts').insert(output, function(err, docs) {
 				if (err) {
-					console.log("Error saving tweet to database: " + err);
+					utility.update_status("Error saving tweet to database: " + err);
 				} else {
-					console.log("Saved tweet to database");
+					utility.update_status("Saved tweet to database");
 				}
 			});
 
@@ -233,14 +234,14 @@ var tweet_handler = function(tweet, config) {
 			arduino.send_arduino_message(config, output.id, output.matches[0].color1, output.matches[0].color2, display);
 						
 		} else {
-			console.log("Did not match anything -- not displaying");
+			utility.update_status("Did not match anything -- not displaying");
 			
 			if (typeof tweet.place!='undefined' && tweet.place !== null &&
 				(tweet.place.name == "New Jersey" || tweet.place.name == "Pennsylvania" || tweet.place.full_name.indexOf(", PA") != -1)) {
-				console.log("Probably because place is PA or NJ");
+				utility.update_status("Probably because place is PA or NJ");
 			} else {
-				console.log(tweet);
-				console.log("--------------\n\n");
+				utility.update_status(tweet);
+				utility.update_status("--------------\n\n");
 			}
 		}
 

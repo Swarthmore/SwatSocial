@@ -1,0 +1,83 @@
+<div class='message twitter' id='<%= content.id %>' style='position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #555555>'> 
+		
+	<div style="position:relative;float:left;height:90px;">
+		<img style='position:relative;float:left;clear:right;width:73px;height:73px' src='<%= content.user.profile_image_url %>'> <BR>
+		<img style='float:left;' src='/img/twitter_icon.png' > 
+	</div>
+	
+	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'><%= formatted_time %></div>
+	
+	
+	
+	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
+		<b>@<%= content.user.screen_name %></b><span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.name %></span><BR> 
+		<%= content.text %><BR>
+			
+		<% 
+			var users = _.filter(matches, function(m) { return m.matchtype == "User";});
+			if (users.length > 0) {
+				print("<span id='" + content.id + "_usermatch' style='font-size: 50%'>");
+				print("<b>User match</b>: ");
+				_.each(users, function(element, index, list) { 
+					print (element.match + "&nbsp;");
+				});	
+				print("</span>");
+			}
+			
+			var terms = _.filter(matches, function(m) { return m.matchtype == "Term";});
+			if (terms.length > 0) {
+				print("<span id='" + content.id + "_termmatch' style='font-size: 50%'>");
+				print("<b>Term match</b>: ");
+				_.each(terms, function(element, index, list) { 
+					print (element.match + "&nbsp;");
+				});	
+				print("</span>");
+			}			
+			
+			var urls = _.filter(matches, function(m) { return m.matchtype == "URL";});
+			if (urls.length > 0) {
+				print("<span id='" + content.id + "_urlmatch' style='font-size: 50%'>");
+						
+				print("<b>URL match</b>: ");
+				_.each(urls, function(element, index, list) { 
+				
+					// Strip any HTML formatting
+					var url = $('<div>' + element.match + '</div>').text();
+					
+					if (url.length > 15) {
+						url_text = url.substring(0,25)+'...';
+					} else {
+						url_text = url;
+					}
+							
+					print ("<a href='" + url + "' target='_blank'>" + url_text + "</a>&nbsp;");
+				});	
+				print("</span>");
+			}	
+			
+
+			var locations = _.filter(matches, function(m) { return m.matchtype == "Location";});
+			if (locations.length > 0) {
+				print("<span id='" + content.id + "_locationmatch' style='font-size: 50%'>");
+				print("<b>Location match</b>: ");
+				_.each(locations, function(element, index, list) { 
+					print (element.match + "&nbsp;");
+				});	
+				print("</span>");
+			}				
+			
+			%>
+
+	</div> 
+	
+	
+	<div style='position:absolute;bottom:3px;right:5px;width:50%;font-size:50%;text-align:right'>From 
+	
+		<%
+			// Strip any HTML formatting
+			var source = $('<div>' + content.source + '</div>').text();	
+			print(source);	
+		%>
+	</div>
+	
+</div>
