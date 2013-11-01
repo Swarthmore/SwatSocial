@@ -111,7 +111,7 @@ var get_Instagram_posts = function(config, url) {
 				
 			
 				// Save Tweet to database
-				output._id = new ObjectId();
+				output._id = new BSON.ObjectID();
 				config.db.collection('posts').insert(output, function(err, docs) {
 					if (err) {
 						utility.update_status("Error saving instagram post to database: " + err);

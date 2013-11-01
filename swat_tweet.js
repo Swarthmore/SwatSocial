@@ -221,7 +221,7 @@ var tweet_handler = function(tweet, config) {
 			
 			// Save Tweet to database
 			// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
-			output._id = new ObjectId();
+			output._id = new BSON.ObjectID();
 			var _id = config.db.collection('posts').insert(output, function(err, docs) {
 				if (err) {
 					utility.update_status("Error saving tweet to database: " + err);
