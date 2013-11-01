@@ -217,17 +217,21 @@ var tweet_handler = function(tweet, config) {
 			});
 			
 	
-			utility.update_status("Tweet send out");
-			io.sockets.emit('tweet',output);		
+	
 			
 			// Save Tweet to database
-			config.db.collection('posts').insert(output, function(err, docs) {
+			// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
+			output._id = new ObjectId();
+			var _id = config.db.collection('posts').insert(output, function(err, docs) {
 				if (err) {
 					utility.update_status("Error saving tweet to database: " + err);
 				} else {
 					utility.update_status("Saved tweet to database");
 				}
 			});
+
+			utility.update_status("Tweet send out");
+			io.sockets.emit('tweet',output);	
 
 			// Flash lights on Arduino based on first matched attribute
 			var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
