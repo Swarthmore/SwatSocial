@@ -46,7 +46,7 @@ infinite_scroll = _.debounce(function() {
 //window.addEventListener("scroll", infinite_scroll);
 
 $(window).scroll( function() {
-	console.log($(window).scrollTop(), $(document).height(), $(window).height());
+	//console.log($(window).scrollTop(), $(document).height(), $(window).height());
 
 if( $(window).scrollTop() > $(document).height() - $(window).height() -50 ) {
 
@@ -129,6 +129,12 @@ function render(tmpl_name, tmpl_data) {
 		socket.on('instagram', function(data) {
 			console.debug(data);
 			showMessage(data, "_instagram_template");
+		});
+
+		socket.on('instagram_previous', function(data) {
+			console.debug("Got an old Instagram");
+			console.debug(data);
+			showPreviousMessage(data, '_instagram_template');
 		});
 	
 		// When socket is opened, display notification message
