@@ -1,5 +1,8 @@
 var arduino = require("./swat_arduino"),
-	utility = require("./utility");
+	utility = require("./utility"),
+	mongo = require('mongodb');
+	
+var BSON = mongo.BSONPure;	
 
 var connect_to_twitter = function (config, callback) {
 	var err;	
@@ -127,6 +130,7 @@ var tweet_handler = function(tweet, config) {
 		output.id = tweet.id;
 		output.type = "tweet";
 		output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
+		output.unixtime = moment.unix(tweet.created_at) + 0;
 		output.matches = [];
 		
 		
@@ -135,15 +139,15 @@ var tweet_handler = function(tweet, config) {
 		config.twitter_defs.every(function(r, index, array) {
 		
 			// Remove @ and # from start of search term
-			var term = (r.term.charAt(0)=="@" || r.term.charAt(0)=="#" ? r.term.substr(1) : r.term)
+			//var term = (r.term.charAt(0)=="@" || r.term.charAt(0)=="#" ? r.term.substr(1) : r.term)
 			
 			// Look for a user match
 			if (tweet.user.id == r.userid) {
-				utility.update_status("Matched user: " + r.term);
+				utility.update_status("Matched user: " + tweet.user.screen_name);
 					
 				var match = {
 					matchtype: "User",
-					match: r.term,
+					match: tweet.user.screen_name,
 					color1:  r.color1,
 					color2:  r.color2,
 					display_mode: r.displaymode
@@ -153,9 +157,9 @@ var tweet_handler = function(tweet, config) {
 
 				
 			// See if it matched a search term	
-			if (tweet.text.toLowerCase().indexOf(term) != -1) {
+			if (tweet.text.toLowerCase().indexOf(r.term) != -1) {
 						
-				utility.update_status("Matched search term: " + term);
+				utility.update_status("Matched search term: " + r.term);
 				
 				var match = {
 					matchtype: "Term",
@@ -169,9 +173,9 @@ var tweet_handler = function(tweet, config) {
 			
 			
 				// See if there is a search term match in a URL
-			if (typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(term) != -1) {
+			if (typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(r.term) != -1) {
 								
-				utility.update_status("Matched search term " + term + " in URL:");
+				utility.update_status("Matched search term " + r.term + " in URL:");
 				utility.update_status(tweet.entities.urls);
 						
 				var url_match = _und.pluck(tweet.entities.urls, 'expanded_url').join();		

@@ -140,12 +140,16 @@ function render(tmpl_name, tmpl_data) {
 		// When socket is opened, display notification message
 		socket.on('connect', function() { 
 			
-			var data = {};
-			data.id = "new_connection_" + new Date().getTime()		// Set unique ID
-			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
-			data.message = "Started connection to server.";
-			showMessage(data, "status_template");
-		
+			// Add a connection status message (but don't add if there is another one at the top already)
+			var first_messagebox = $("#inbox div.message:first-child");
+			if (first_messagebox.length==0 || first_messagebox.eq(0).attr("id").indexOf("new_connection_") != 0) {
+				var data = {};
+				data.id = "new_connection_" + new Date().getTime()		// Set unique ID
+				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+				data.message = "Started connection to server.";
+				showMessage(data, "status_template");
+			}
+					
 			// Turn off automatic attempts to start socket
 			clearInterval(socketTimer);
 		
@@ -160,11 +164,15 @@ function render(tmpl_name, tmpl_data) {
 		// If socket is closed, display notification message
 		socket.on('disconnect', function() {  
 		
-			var data = {};
-			data.id = "closed_connection_" + new Date().getTime()		// Set unique ID
-			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
-			data.message = "Connection with server interrupted.";
-			showMessage(data, "status_template");
+			// Add a connection status message (but don't add if there is another one at the top already)
+			var first_messagebox = $("#inbox div.message:first-child");
+			if (first_messagebox.length==0 || first_messagebox.eq(0).attr("id").indexOf("closed_connection_") != 0) {
+				var data = {};
+				data.id = "closed_connection_" + new Date().getTime()		// Set unique ID
+				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+				data.message = "Connection with server interrupted.";
+				showMessage(data, "status_template");
+			}
 		
 			// Turn off automatic attempts to send heartbeat
 			clearInterval(socketTimer);		
@@ -175,12 +183,17 @@ function render(tmpl_name, tmpl_data) {
 	
 		// If there is a socket error, display a notification message
 		socket.on("error", function() {  
+
+			// Add a connection status message (but don't add if there is another one at the top already)
+			var first_messagebox = $("#inbox div.message:first-child");
+			if (first_messagebox.length==0 || first_messagebox.eq(0).attr("id").indexOf("connection_error_") != 0) {
 		
-			var data = {};
-			data.id = "connection_error_" + new Date().getTime()		// Set unique ID
-			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
-			data.message = "Websocket error.";
-			showMessage(data, "status_template");
+				var data = {};
+				data.id = "connection_error_" + new Date().getTime()		// Set unique ID
+				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+				data.message = "Websocket error.";
+				showMessage(data, "status_template");
+			}
 		
 		}); // End of socket on error
 	} // end of start_ws
@@ -189,7 +202,7 @@ function render(tmpl_name, tmpl_data) {
 	
 	function showMessage(message, template) {	
 		// Don't show duplicate messages (compare id's)
-		var existing = $("#" + message.id);
+		var existing = $("#" + message._id);
 		if (existing.length > 0) return;
 		var m = render(template, message);
 		$(m).prependTo("#inbox").hide().slideDown();
@@ -198,7 +211,7 @@ function render(tmpl_name, tmpl_data) {
 
 	function showPreviousMessage(message, template) {	
 		// Don't show duplicate messages (compare id's)
-		var existing = $("#" + message.id);
+		var existing = $("#" + message._id);
 		if (existing.length > 0) return;
 		var m = render(template, message);
 		$(m).appendTo("#inbox").hide().slideDown();
