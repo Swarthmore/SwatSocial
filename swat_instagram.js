@@ -116,7 +116,7 @@ var get_Instagram_posts = function(config, url, count) {
 					output.id = ig_posts[i].id;
 					output.type = "instagram";
 					output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
-					output.unixtime = moment.unix(ig_posts[i].created_time) + 0;
+					output.unixtime = moment(ig_posts[i].created_time).format("X");
 
 					// Save Tweet to database and send out
 					output._id = new BSON.ObjectID();

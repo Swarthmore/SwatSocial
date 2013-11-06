@@ -130,7 +130,7 @@ var tweet_handler = function(tweet, config) {
 		output.id = tweet.id;
 		output.type = "tweet";
 		output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
-		output.unixtime = moment.unix(tweet.created_at) + 0;
+		output.unixtime = moment(tweet.created_at).format("X");
 		output.matches = [];
 		
 		
@@ -138,9 +138,6 @@ var tweet_handler = function(tweet, config) {
 		// Loop through all the terms set up in the Google Doc looking for a match
 		config.twitter_defs.every(function(r, index, array) {
 		
-			// Remove @ and # from start of search term
-			//var term = (r.term.charAt(0)=="@" || r.term.charAt(0)=="#" ? r.term.substr(1) : r.term)
-			
 			// Look for a user match
 			if (tweet.user.id == r.userid) {
 				utility.update_status("Matched user: " + tweet.user.screen_name);
@@ -156,19 +153,24 @@ var tweet_handler = function(tweet, config) {
 			}		
 
 				
-			// See if it matched a search term	
-			if (tweet.text.toLowerCase().indexOf(r.term) != -1) {
-						
-				utility.update_status("Matched search term: " + r.term);
+			// See if it matched a search term (make sure there isn't an @ or # in front
+			var term_location = tweet.text.toLowerCase().indexOf(r.term)
+			if (term_location != -1) {
 				
-				var match = {
-					matchtype: "Term",
-					match: r.term,
-					color1:  r.color1,
-					color2: r.color2,
-					display_mode: r.displaymode
-				}				
-				output.matches.push(match);
+				// Accept if the term is the first position or it is somewhere else but not immediately preceded by @ or #
+				if (term_location == 0  || ( (tweet.text.charAt(term_location-1) != "@") && (tweet.text.charAt(term_location-1) != "#"))) {
+										
+					utility.update_status("Matched search term: " + r.term);
+				
+					var match = {
+						matchtype: "Term",
+						match: r.term,
+						color1:  r.color1,
+						color2: r.color2,
+						display_mode: r.displaymode
+					}				
+					output.matches.push(match);
+				}
 			}	
 			
 			

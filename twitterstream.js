@@ -41,10 +41,9 @@ function load_config() {
 		}, 
 		
 		function(callback) {
-			start_server(config, callback);
-		}, 
-
-	
+			connect_to_db(config, callback);
+		},
+			
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
 		},
@@ -58,8 +57,9 @@ function load_config() {
 		},
 		
 		function(callback) {
-			connect_to_db(config, callback);
-		}
+			start_server(config, callback);
+		}	
+
 	]);
 }	
 
@@ -201,7 +201,7 @@ io.sockets.on('connection', function(socket) {
 function last_posts(n, callback) {
 
 	utility.update_status("Retrieving last " + n + " posts");
-	config.db.collection('posts').find({}).sort({_id:-1}).limit(n).toArray(
+	config.db.collection('posts').find({}).sort({unixtime:-1}).limit(n).toArray(
 	function(err, docs) {
 		docs.reverse(); // Want most recent sent last
 		docs.forEach(function(doc) {
