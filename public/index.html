@@ -24,66 +24,68 @@ var tweet_template;
 var instagram_template;
 var socket;
 
+
+
 $(document).ready(function() {
 	start_ws();		// Start web sockets	
-});
+	
+	// Setup infinite scroll
+	$(window).scroll( function() {
+		if( $(window).scrollTop() > $(document).height() - $(window).height() -50 ) {
+			console.log("Call infinite scroll");
+			infinite_scroll();
+		}	
+	});
+	
+}); // End ready function
 
-infinite_scroll = _.debounce(function() {
+
+
+
+
+
+	// Set up the infinite scroll function.
+	// It needs to be debounced so it isn't called a bunch of times in a row.
+	infinite_scroll = _.debounce(function() {
+		console.log("Fetch more data!");
 		
-			console.log("Fetch more data!");
+		// Get the last item in the inbox. 
+		last_id = $("#inbox .message").not(".status" ).last().attr("id"); 
 		
-			// Get the last item in the inbox. 
-			last_id = $("#inbox .message").not(".status" ).last().attr("id"); 
-		
-			// Load older posts
-			load_previous_posts(last_id);
+		// Load older posts
+		load_previous_posts(last_id);
 		
 		}, 100, true);	
 		
 	
 
+	// Set up template rendering function.  This will load templates the first time they are
+	// used and then cache them.  
 
-//window.addEventListener("scroll", infinite_scroll);
+	function render(tmpl_name, tmpl_data) {
+		if ( !render.tmpl_cache ) { 
+			render.tmpl_cache = {};
+		}
 
-$(window).scroll( function() {
-	//console.log($(window).scrollTop(), $(document).height(), $(window).height());
+		if ( ! render.tmpl_cache[tmpl_name] ) {
+			var tmpl_dir = '/template';
+			var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
 
-if( $(window).scrollTop() > $(document).height() - $(window).height() -50 ) {
+			var tmpl_string;
+			$.ajax({
+				url: tmpl_url,
+				method: 'GET',
+				async: false,
+				success: function(data) {
+					tmpl_string = data;
+				}
+			});
 
-	console.log("Call infinite scroll");
-	infinite_scroll();
+			render.tmpl_cache[tmpl_name] = _.template(tmpl_string);
+		}
+
+		return render.tmpl_cache[tmpl_name](tmpl_data);
 	}
-	
-});
-	
-	
-
-
-
-function render(tmpl_name, tmpl_data) {
-    if ( !render.tmpl_cache ) { 
-        render.tmpl_cache = {};
-    }
-
-    if ( ! render.tmpl_cache[tmpl_name] ) {
-        var tmpl_dir = '/template';
-        var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
-
-        var tmpl_string;
-        $.ajax({
-            url: tmpl_url,
-            method: 'GET',
-            async: false,
-            success: function(data) {
-                tmpl_string = data;
-            }
-        });
-
-        render.tmpl_cache[tmpl_name] = _.template(tmpl_string);
-    }
-
-    return render.tmpl_cache[tmpl_name](tmpl_data);
-}
 
 
 
@@ -102,16 +104,19 @@ function render(tmpl_name, tmpl_data) {
 
 
 	function start_ws() {
-	/*
-		while(typeof tweet_template != undefined) {
-			console.log("Waiting");
-		}
-	*/
-		socket = io.connect('http://23.23.177.220');
+
+		socket = io.connect('http://23.23.177.220', {
+			'reconnect': true,
+  			'reconnection delay': 500,
+  			'max reconnection attempts': Infinity
+		});
 		var socketTimer;
 		var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
 				
-	
+
+
+		// SOCKET MESSAGE DEFINITIONS 
+
 		socket.on('tweet', function(data) {
 			console.debug(data);
 			showMessage(data, '_tweet_template');
@@ -137,6 +142,10 @@ function render(tmpl_name, tmpl_data) {
 			showPreviousMessage(data, '_instagram_template');
 		});
 	
+	
+	
+	
+	
 		// When socket is opened, display notification message
 		socket.on('connect', function() { 
 			
@@ -161,6 +170,9 @@ function render(tmpl_name, tmpl_data) {
 			
 		}); // End of socket open routine 	
 
+
+
+
 		// If socket is closed, display notification message
 		socket.on('disconnect', function() {  
 		
@@ -181,6 +193,9 @@ function render(tmpl_name, tmpl_data) {
 			socketTimer = setInterval(function(){start_ws()}, 5000);
 		});  // End of socket close	
 	
+	
+	
+	
 		// If there is a socket error, display a notification message
 		socket.on("error", function() {  
 
@@ -194,8 +209,9 @@ function render(tmpl_name, tmpl_data) {
 				data.message = "Websocket error.";
 				showMessage(data, "status_template");
 			}
-		
 		}); // End of socket on error
+		
+		
 	} // end of start_ws
 	
 

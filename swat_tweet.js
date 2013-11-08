@@ -1,6 +1,7 @@
 var arduino = require("./swat_arduino"),
 	utility = require("./utility"),
-	mongo = require('mongodb');
+	mongo = require('mongodb'),
+	GoogleSpreadsheet = require("google-spreadsheet");
 	
 var BSON = mongo.BSONPure;	
 
@@ -24,10 +25,12 @@ var load_Twitter_search_terms = function(config, callback) {
 	
 	utility.update_status("Connecting to Google Doc for Twitter search terms");
 
-	var my_sheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
-	my_sheet.getRows( 1, function(err, row_data){
+	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
 	
-	 	my_sheet.getInfo( function( err, sheet_info ){
+	// Load search terms
+	socialmedia_spreadsheet.getRows( 1, function(err, row_data){
+	
+	 	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
 	 		if (err) {
 	 			utility.update_status(err);
 	 			return;
@@ -68,6 +71,34 @@ var load_Twitter_search_terms = function(config, callback) {
 		callback(null,config);
 		
 	})
+	
+	// Load Blacklist users
+	socialmedia_spreadsheet.getRows( 2, function(err, bl_row_data){
+	
+		if(err) {
+			utility.update_status("Could not connect to Twitter Blacklist " + err);
+		}
+	
+		socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
+	 		if (err) {
+	 			utility.update_status(err);
+	 			return;
+	 		} else {
+        	utility.update_status( sheet_info.title + ' is loaded' );
+        	}
+        });
+	
+		utility.update_status( 'Found '+bl_row_data.length + ' rows in Google Doc');
+		
+		config.twitter_blacklist = [];
+		
+		bl_row_data.forEach(function(row) {
+			config.twitter_blacklist.push(row.user);
+		});	
+		
+		utility.update_status("Twitter Blacklisted users:\n" + config.twitter_blacklist);
+	});
+	
 	
 }
 
@@ -132,6 +163,12 @@ var tweet_handler = function(tweet, config) {
 		output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
 		output.unixtime = moment(tweet.created_at).format("X");
 		output.matches = [];
+		
+		// If the user is on the blacklist, exit
+		if (config.twitter_blacklist.indexOf(tweet.user.screen_name) > -1) {
+			update_status("Twitter user " + tweet.user.screen_name + " is blacklisted.  No further processing");
+			return;
+		}
 		
 		
 		// Figure out which search term it matches

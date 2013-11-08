@@ -8,7 +8,12 @@
 	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'><%= formatted_time %></div>
 
 	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
-		<b>@<%= content.user.username %></b><span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.full_name %></span><BR> 
+		<b>
+			<a href="http://instagram.com/<%= content.user.username %>" target="_blank">
+				@<%= content.user.username %>
+			</a>
+		</b>
+		<span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.full_name %></span><BR> 
 		
 		<table style="border:0px solid #555555;width:80%">
 		<tr><td style="width:150px">
@@ -16,7 +21,11 @@
 				<img style="height:150px;width150px;float:left;padding-right:8px;" src="<%= content.images.thumbnail.url %>">
 			</a>
 		</td><td style="font-size:75%;text-align:left;vertical-align:top;word-wrap:break-word;">
-			<%= content.caption.text %><BR>
+			<% if (content.caption !== null && content.caption.text !== 'undefined') {
+					print(content.caption.text);
+				}
+			%>
+			<BR>
 			<span id="<%= content.id %>_source" style='font-size: 50%'><%= content.filter %></span><BR>
 			
 			<% _.each(content.tags, function(element, index, list) {   

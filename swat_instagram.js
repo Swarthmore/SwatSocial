@@ -116,17 +116,20 @@ var get_Instagram_posts = function(config, url, count) {
 					output.id = ig_posts[i].id;
 					output.type = "instagram";
 					output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
-					output.unixtime = moment(ig_posts[i].created_time).format("X");
+					output.unixtime = ig_posts[i].created_time;
 
-					// Save Tweet to database and send out
+					// Save Instagram to database and send out
 					output._id = new BSON.ObjectID();
 					config.db.collection('posts').insert(output, function(err, docs) {
 						if (err) {
-							utility.update_status("Could not save instagram post id " + output.id + " to database: " + err);
+							utility.update_status("Could not save instagram post id " + doc.id + " to database: " + err);
 						} else {
-							utility.update_status("Saved instagram post id " + output.id + " to database");
-							io.sockets.emit('instagram',output);		
-							utility.update_status("Instagram post id " + output.id  + " sent out out to clients");
+							utility.update_status("Saved instagram post id " + doc.id + " to database");
+							io.sockets.emit('instagram',doc);		
+							utility.update_status("Instagram post id " + doc.id  + " sent out out to clients");
+							arduino.send_arduino_message(config, doc.id, "FFFFFF", "000000", 2);
+			
+                                
 						}
 					});
 				} // End of looping through posts

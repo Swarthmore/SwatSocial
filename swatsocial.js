@@ -8,7 +8,6 @@ var http = require('http'),
   	util = require('util'),
   	iniparser = require('iniparser'),
   	async = require('async'),
-  	GoogleSpreadsheet = require("google-spreadsheet"),
   	_und = require("underscore"),
   	static = require('node-static'),
   	moment = require('moment');

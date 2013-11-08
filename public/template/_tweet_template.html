@@ -18,7 +18,11 @@
 	
 	
 	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
-		<b>@<%= content.user.screen_name %></b><span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.name %></span><BR> 
+		<b>
+			<a href="https://twitter.com/<%= content.user.screen_name %>" target='_blank'>
+			@<%= content.user.screen_name %></a>
+		</b>
+		<span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.name %></span><BR> 
 		<%= content.text %><BR>
 			
 		<% 
@@ -69,7 +73,7 @@
 				print("<span id='" + content.id + "_locationmatch' style='font-size: 50%'>");
 				print("<b>Location match</b>: ");
 				_.each(locations, function(element, index, list) { 
-					print (element.match + "&nbsp;");
+					print ("<a href='https://www.google.com/maps#!q=" + element.match + "' target='_blank'>" + element.match + "</a>&nbsp;");
 				});	
 				print("</span>");
 			}				
