@@ -8,8 +8,9 @@ var BSON = mongo.BSONPure;
 MongoClient.connect('mongodb://127.0.0.1:27017/swatsocial', function(err, db) {
 	if(err) {console.log("Can't connect to database: " + err);}
 
-	db.collection('posts').find({unixtime:"Invalid date"}).sort({_id:-1}).toArray(
-		function(err, docs) {
+	//db.collection('posts').find({unixtime:"Invalid date"}).sort({_id:-1}).toArray(
+	db.collection('posts').find().sort({_id:-1}).toArray(
+		function(err, docs) {		
 			docs.forEach(function(doc) {
 				console.log(doc.type);
 				console.log(doc.formatted_time);

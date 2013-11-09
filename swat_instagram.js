@@ -120,14 +120,14 @@ var get_Instagram_posts = function(config, url, count) {
 
 					// Save Instagram to database and send out
 					output._id = new BSON.ObjectID();
-					config.db.collection('posts').insert(output, function(err, docs) {
+					config.db.collection('posts').insert(output, function(err, db) {
 						if (err) {
-							utility.update_status("Could not save instagram post id " + doc.id + " to database: " + err);
+							utility.update_status("Could not save instagram post id " + output.id + " to database: " + err);
 						} else {
-							utility.update_status("Saved instagram post id " + doc.id + " to database");
-							io.sockets.emit('instagram',doc);		
-							utility.update_status("Instagram post id " + doc.id  + " sent out out to clients");
-							arduino.send_arduino_message(config, doc.id, "FFFFFF", "000000", 2);
+							utility.update_status("Saved instagram post id " + output.id + " to database");
+							io.sockets.emit('instagram',output);		
+							utility.update_status("Instagram post id " + output.id  + " sent out out to clients");
+							arduino.send_arduino_message(config, output.id, "FFFFFF", "000000", 2);
 			
                                 
 						}

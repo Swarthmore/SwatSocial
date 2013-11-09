@@ -29,6 +29,11 @@ var load_Twitter_search_terms = function(config, callback) {
 	
 	// Load search terms
 	socialmedia_spreadsheet.getRows( 1, function(err, row_data){
+
+		if (err) {
+			utility.update_status("Error opening Google spreadsheet: " + err);
+			return;
+		}
 	
 	 	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
 	 		if (err) {
@@ -236,10 +241,10 @@ var tweet_handler = function(tweet, config) {
 		if (typeof tweet.coordinates!='undefined' && tweet.coordinates !== null && tweet.coordinates.coordinates[0] <= -75.350075 &&  tweet.coordinates.coordinates[0] >=-75.359216 &&  tweet.coordinates.coordinates[1] >= 39.898439 &&  tweet.coordinates.coordinates[1] <= 39.909144) {
 		
 			utility.update_status("Matched location: " + tweet.coordinates.coordinates);
-		
+					
 			var match = {
 				matchtype: "Location",
-				match: tweet.coordinates.coordinates.join(),
+				match: tweet.coordinates.coordinates.reverse().join(), 	// Lat and lon are reversed in Tweeter feeds
 				color1:  "FF0000",
 				color2:  "A00000",
 				display_mode: "party_mode"

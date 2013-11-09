@@ -218,7 +218,7 @@ function previous_posts(data, callback) {
 
 	utility.update_status("Retrieving " + data.limit + " posts, starting at post ID "  + data.id);
 	var o_id = new BSON.ObjectID(data.id);
-	config.db.collection('posts').find({ _id: { $lt: o_id } }).sort({_id:-1}).limit(data.limit).toArray(
+	config.db.collection('posts').find({ _id: { $lt: o_id } }).sort({unixtime:-1}).limit(data.limit).toArray(
 	function(err, docs) {
 		docs.forEach(function(doc) {
 			callback(doc);
