@@ -1,38 +1,34 @@
-<div class='message instagram' id='<%= _id %>' style='position:relative;min-height: 200px;background-color:#eeeeee;border:3px solid #555555'> 
-
-	<div style="position:relative;float:left;height:90px;">
-		<img style='position:relative;float:left;clear:right;width:73px;height:73px' src='<%=content.user.profile_picture %>'> <BR>
-		<img style='float:left;' src='/img/instagram_icon.png' > 
+<div class='message instagram' id='<%= _id %>'> 
+	<div class='source_icons'>
+		<img class='user_avatar' src='<%=content.user.profile_picture %>'> <BR>
+		<img class='favicons' src='/img/instagram_icon.png' > 
 	</div>
 	
-	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'><%= formatted_time %></div>
+	<div class='date_time'>
+		<%= formatted_time %>
+	</div>
 
-	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
-		<b>
-			<a href="http://instagram.com/<%= content.user.username %>" target="_blank">
-				@<%= content.user.username %>
-			</a>
-		</b>
-		<span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.full_name %></span><BR> 
-		
-		<table style="border:0px solid #555555;width:80%">
-		<tr><td style="width:150px">
-			<a href="<%= content.images.standard_resolution.url %>" target='_blank'>
-				<img style="height:150px;width150px;float:left;padding-right:8px;" src="<%= content.images.thumbnail.url %>">
-			</a>
-		</td><td style="font-size:75%;text-align:left;vertical-align:top;word-wrap:break-word;">
-			<% if (content.caption !== null && content.caption.text !== 'undefined') {
-					print(content.caption.text);
-				}
-			%>
+	<div class='post'>
+		<div class='username'>			
+		<b>@<%= content.user.username %></b><span class='display_name'> ~ <%= content.user.full_name %></span><BR> 
+		</div>
+		<div class='post_content' >
+			<div>
+				<a href="<%= content.images.standard_resolution.url %>" target='_blank'>
+					<img src="<%= content.images.thumbnail.url %>">
+				</a>
+				<div class='instagram_filter' id="<%= content.id %>_source" style='font-size: 50%'>
+					<%= content.filter %>
+				</div>
+			</div>
+		<div class='post_caption'>
+			<%= content.caption.text %>
 			<BR>
-			<span id="<%= content.id %>_source" style='font-size: 50%'><%= content.filter %></span><BR>
-			
 			<% _.each(content.tags, function(element, index, list) {   
-				print("<span>" + element + "&nbsp;</span>");			
+				print("<span>" + element + " </span>");			
 			}); %>
 
-		</td></tr></table>
+		</div>
 	</div> 
 
 </div>
