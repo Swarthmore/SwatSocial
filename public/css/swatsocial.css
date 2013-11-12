@@ -79,6 +79,18 @@ td {
 	border: 3px solid rgb(85, 85, 85); 
 	display: block;
 }
+.twitter
+{
+	position:relative;
+	min-height: 50px;
+	/*-- why are these different? I'll make them the same...
+	background-color:#eeeeee;
+	border:3px solid #555555;
+	---*/
+	background-color: rgb(238, 238, 238); 
+	border: 3px solid rgb(85, 85, 85);
+	display: block; 
+}
 
 
 .source_icons
@@ -156,5 +168,9 @@ min-height: 50px;
 }
 
 .instagram_filter{float:left;clear:left;font-size: 50%;}
+
+.matches {
+font-size: 50%;
+}
 
 /*---End MK Changes --*/
