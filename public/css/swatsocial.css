@@ -67,3 +67,94 @@ td {
 	font-size: 24pt;
 	font-weight: bold;
 }
+
+
+/*---Begin MK Changes --*/
+
+.instagram
+{
+	position: relative; 
+	min-height: 200px; 
+	background-color: rgb(238, 238, 238); 
+	border: 3px solid rgb(85, 85, 85); 
+	display: block;
+}
+
+
+.source_icons
+{
+	position:relative;
+	float:left;
+	height:90px;
+}
+.source_icons img
+{
+float:left;	
+}
+.user_avatar {
+	position:relative;
+	clear:right;
+	width:73px;
+	height:73px;
+}
+.favicons
+{
+	
+}
+.date_time
+{
+	position:absolute;
+	top:3px;
+	right:5px;
+	width:50%;
+	font-size:50%;
+	text-align:right;
+}
+
+
+.post 
+{
+position:relative;
+vertical-align:top;
+margin-left:80px;
+min-height: 50px;
+}
+
+/*--- Begin Username Block: containing @Username, link to profile, and display name ---*/
+.username
+{}
+
+/*---Linked username... @username ---*/
+
+.source_link
+{}
+
+.display_name
+{
+	color:#555555;
+	font-size:70%;
+}
+/*--- End Username Block ---*/
+
+.post_content
+{ style="border:0px solid #555555;width:80%;"}
+
+.instagram .post_content img
+{
+	height:150px;
+	width:150px;
+	float:left;
+	padding-right:8px;
+}
+
+.post_caption
+{
+	font-size:75%;
+	text-align:left;
+	vertical-align:top;
+	word-wrap:break-word;
+}
+
+.instagram_filter{float:left;clear:left;font-size: 50%;}
+
+/*---End MK Changes --*/
