@@ -1,11 +1,10 @@
-<div class='message twitter' id='<%= _id %>' style='position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #555555>'> 
-		
-	<div style="position:relative;float:left;height:90px;">
-		<img style='position:relative;float:left;clear:right;width:73px;height:73px' src='<%= content.user.profile_image_url %>'> <BR>
-		<img style='float:left;' src='/img/twitter_icon.png' > 
+<div class='message twitter' id='<%= _id %>'> 
+	<div class='source_icons'>
+		<img class='user_avatar' src='<%= content.user.profile_image_url %>'> <BR>
+		<img class='favicons' src='/img/twitter_icon.png'> 
 	</div>
 	
-	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'>
+	<div class='date_time'>
 		<%= formatted_time %><BR>
 		From 
 		<%
@@ -17,18 +16,22 @@
 	
 	
 	
-	<div style='position:relative;vertical-align:top;margin-left:80px;min-height: 50px;'>			
-		<b>
+	<div class='post'>			
+		<div class='username'>
+			<b>
 			<a href="https://twitter.com/<%= content.user.screen_name %>" target='_blank'>
 			@<%= content.user.screen_name %></a>
 		</b>
-		<span style="color:#555555;font-size:70%">&nbsp;~&nbsp;<%= content.user.name %></span><BR> 
+		<span class='display_name'> ~ <%= content.user.name %></span>
+		</div>
+
+		<div class='post_content'>
 		<%= content.text %><BR>
 			
-		<% 
-			var users = _.filter(matches, function(m) { return m.matchtype == "User";});
+			<div class='matches'>
+				<% var users = _.filter(matches, function(m) { return m.matchtype == "User";});
 			if (users.length > 0) {
-				print("<span id='" + content.id + "_usermatch' style='font-size: 50%'>");
+				print("<span id='" + content.id + "_usermatch' class='user_match'>");
 				print("<b>User match</b>: ");
 				_.each(users, function(element, index, list) { 
 					print (element.match + "&nbsp;");
@@ -38,7 +41,7 @@
 			
 			var terms = _.filter(matches, function(m) { return m.matchtype == "Term";});
 			if (terms.length > 0) {
-				print("<span id='" + content.id + "_termmatch' style='font-size: 50%'>");
+				print("<span id='" + content.id + "_termmatch' class='term_match'>");
 				print("<b>Term match</b>: ");
 				_.each(terms, function(element, index, list) { 
 					print (element.match + "&nbsp;");
@@ -48,7 +51,7 @@
 			
 			var urls = _.filter(matches, function(m) { return m.matchtype == "URL";});
 			if (urls.length > 0) {
-				print("<span id='" + content.id + "_urlmatch' style='font-size: 50%'>");
+				print("<span id='" + content.id + "_urlmatch' class='url_match'>");
 						
 				print("<b>URL match</b>: ");
 				_.each(urls, function(element, index, list) { 
@@ -70,7 +73,7 @@
 
 			var locations = _.filter(matches, function(m) { return m.matchtype == "Location";});
 			if (locations.length > 0) {
-				print("<span id='" + content.id + "_locationmatch' style='font-size: 50%'>");
+				print("<span id='" + content.id + "_locationmatch' class='location_match'>");
 				print("<b>Location match</b>: ");
 				_.each(locations, function(element, index, list) { 
 					print ("<a href='https://www.google.com/maps#!q=" + element.match + "' target='_blank'>" + element.match + "</a>&nbsp;");
@@ -79,13 +82,8 @@
 			}				
 			
 			%>
-
+			</div>
+		</div>
 	</div> 
-	
-	
-	<div style='position:absolute;bottom:3px;right:5px;width:50%;font-size:50%;text-align:right'> 
-	
-
-	</div>
 	
 </div>
