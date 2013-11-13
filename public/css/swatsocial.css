@@ -15,15 +15,18 @@
  */
 
 body {
-  background: #444444;
-  margin: 10px;
+  background: #FFFFFF;
+margin:0px;
 }
-
+a:link{
+	text-decoration:none;
+	color:#33CCFF;
+}
 body,
 input {
   font-family: sans-serif;
   font-size: 24pt;
-  color: black;
+  color: #000000;
 }
 
 table {
@@ -44,17 +47,54 @@ td {
 }
 */
 
+/* yet to be added to general template */
+header {
+	background-color:#EFEFEF;
+	margin:0px;
+	padding:5px;
+	border-bottom:1px solid #DEDEDE;
+}
+header button {
+	padding:10px;
+	color:#FFFFFF;
+	font-size:.45em;
+	border: 0px solid #FFFFFF;
+	border-radius:8px;
+	background-color: #FF4D4D;
+	background-color: #AA3355;
+	background-color: #E64066;
+
+}
+#button-box {
+	padding:0px;
+	position: absolute;
+	right:10px;
+	top:2px;
+}
+header h1 {
+	
+	display: inline;
+	color:#777777;
+	font-size:1.25em;
+	margin-left:5px;
+}
 
 #input {
   margin-top: 0.5em;
 }
-
+#inbox{
+	  padding: 10px;
+}
 #inbox .message {
-  padding: 0.25em;
-  border-radius: 5px;
-  background-color:#DDDDDD;
+
+  border-radius: 8px;
+  background-color:#EFEFEF;
   margin:5px;
-  margin-top: 10px;
+  margin-top: 12px;
+  border: 1px solid #DEDEDE;
+/*  -moz-box-shadow: 3px 3px 10px #999999;
+  -webkit-box-shadow: 3px 3px 10px #999999;
+  box-shadow: 3px 3px 10px #999999;*/
 }
 
 #nav {
@@ -75,8 +115,7 @@ td {
 {
 	position: relative; 
 	min-height: 200px; 
-	background-color: rgb(238, 238, 238); 
-	border: 3px solid rgb(85, 85, 85); 
+	background-color: #FFFFFF; 
 	display: block;
 }
 .twitter
@@ -87,14 +126,15 @@ td {
 	background-color:#eeeeee;
 	border:3px solid #555555;
 	---*/
-	background-color: rgb(238, 238, 238); 
-	border: 3px solid rgb(85, 85, 85);
+	background-color: #FFFFFF; 
+
 	display: block; 
 }
 
 
 .source_icons
 {
+	padding: 0.25em;
 	position:relative;
 	float:left;
 	height:90px;
@@ -111,7 +151,8 @@ float:left;
 }
 .favicons
 {
-	
+	clear:both;
+	height:25%;
 }
 .date_time
 {
@@ -128,8 +169,18 @@ float:left;
 {
 position:relative;
 vertical-align:top;
-margin-left:80px;
+margin-left:2.75em;
 min-height: 50px;
+padding: 0.25em;
+background:#FFFFFF;
+border-left:1px solid #D3D3D3;
+-webkit-border-top-right-radius: 8px;
+-webkit-border-bottom-right-radius: 8px;
+-moz-border-radius-topright: 8px;
+-moz-border-radius-bottomright: 8px;
+border-top-right-radius: 8px;
+border-bottom-right-radius: 8px;
+
 }
 
 /*--- Begin Username Block: containing @Username, link to profile, and display name ---*/
@@ -149,7 +200,9 @@ min-height: 50px;
 /*--- End Username Block ---*/
 
 .post_content
-{ style="border:0px solid #555555;width:80%;"}
+{ 
+	font-size:75%;
+}
 
 .instagram .post_content img
 {
@@ -161,16 +214,24 @@ min-height: 50px;
 
 .post_caption
 {
-	font-size:75%;
 	text-align:left;
 	vertical-align:top;
 	word-wrap:break-word;
 }
 
-.instagram_filter{float:left;clear:left;font-size: 50%;}
-
-.matches {
-font-size: 50%;
+.instagram_filter
+{
+	float:left;
+	clear:left;
+	font-size: 50%;
 }
 
+.matches 
+{
+font-size: 50%;
+}
+.clear
+{
+	clear:both;
+}
 /*---End MK Changes --*/
