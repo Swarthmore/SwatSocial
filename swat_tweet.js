@@ -171,7 +171,7 @@ var tweet_handler = function(tweet, config) {
 		
 		// If the user is on the blacklist, exit
 		if (config.twitter_blacklist.indexOf(tweet.user.screen_name) > -1) {
-			update_status("Twitter user " + tweet.user.screen_name + " is blacklisted.  No further processing");
+			utility.update_status("Twitter user " + tweet.user.screen_name + " is blacklisted.  No further processing");
 			return;
 		}
 		
