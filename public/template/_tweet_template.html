@@ -76,7 +76,7 @@
 				print("<span id='" + content.id + "_locationmatch' class='location_match'>");
 				print("<b>Location match</b>: ");
 				_.each(locations, function(element, index, list) { 
-					print ("<a href='https://www.google.com/maps#!q=" + element.match + "' target='_blank'>" + element.match + "</a>&nbsp;");
+					print ("<a href='https://maps.google.com/maps?q=" + element.match + "' target='_blank'>" + element.match + "</a>&nbsp;");
 				});	
 				print("</span>");
 			}				
