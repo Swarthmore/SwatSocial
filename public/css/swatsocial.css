@@ -213,6 +213,13 @@ border-bottom-right-radius: 8px;
 	padding-right:8px;
 }
 
+.twitter .post_content img
+{
+	float:left;
+	padding-right:8px;
+}
+
+
 .post_caption
 {
 	text-align:left;
