@@ -2,6 +2,11 @@
 	<div class='source_icons'>
 		<img class='user_avatar' src='<%= content.user.profile_image_url %>'> <BR>
 		<img class='favicons' src='/img/twitter_icon.png'> 
+		<% var locations = _.filter(matches, function(m) { return m.matchtype == "Location";});
+		if (locations.length > 0) {
+		print ("<img class='favicons' src='/img/geo_icon.png'>");
+		}
+		%>
 	</div>
 	
 	<div class='date_time'>
@@ -92,6 +97,7 @@
 		
 		
 		</div>
+		<div class='clear'></div>
 	</div> 
 	
 </div>
