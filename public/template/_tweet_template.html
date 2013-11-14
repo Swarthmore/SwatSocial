@@ -26,6 +26,11 @@
 		</div>
 
 		<div class='post_content'>
+				<div><% _.each(content.entities.media, function(media) 
+				{ %> 
+					<a href="<%= media.media_url %>" target="_blank"><img src="<%= media.media_url %>:thumb"></a>
+				<% }); %>
+				</div>
 		<%= content.text %><BR>
 		</div>	
 			<div class='matches'>
@@ -82,10 +87,7 @@
 			}							
 			%>
 		
-			<% _.each(content.entities.media, function(media) 
-			{ %> 
-				<a href="<%= media.media_url %>" target="_blank"><img src="<%= media.media_url %>:thumb"></a>
-			<% }); %>		
+			
 	
 		
 		
