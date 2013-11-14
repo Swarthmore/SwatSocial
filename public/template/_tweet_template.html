@@ -79,9 +79,15 @@
 					print ("<a href='https://maps.google.com/maps?q=" + element.match + "' target='_blank'>" + element.match + "</a>&nbsp;");
 				});	
 				print("</span>");
-			}				
-			
+			}							
 			%>
+		
+			<% _.each(content.entities.media, function(media) 
+			{ %> 
+				<a href="<%= media.media_url %>" target="_blank"><img src="<%= media.media_url %>:thumb"></a>
+			<% }); %>		
+	
+		
 		
 		</div>
 	</div> 
