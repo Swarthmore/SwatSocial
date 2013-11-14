@@ -162,6 +162,7 @@ float:left;
 	width:50%;
 	font-size:50%;
 	text-align:right;
+	z-index:10001;
 }
 
 
