@@ -158,16 +158,16 @@ $(document).ready(function() {
 		// When socket is opened, display notification message
 		socket.on('connect', function() { 
 			
-			// Add a connection status message (but don't add if there is another one at the top already)
-			var first_messagebox = $("#inbox div.message:first-child");
-			if (first_messagebox.length==0 || first_messagebox.eq(0).attr("id").indexOf("new_connection_") != 0) {
-				var data = {};
-				data.id = "new_connection_" + new Date().getTime()		// Set unique ID
-				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
-				data.message = "Started connection to server.";
-				showMessage(data, "status_template");
-			}
-					
+			// Add a connection status message 
+			// Remove all other status messages.  
+			$("#inbox div.message.status").remove();
+			var data = {};
+			data.id = "new_connection_" + new Date().getTime()		// Set unique ID
+			data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
+			data.message = "Started connection to server.";
+			showMessage(data, "status_template");
+			console.log("Started connection to server: " + data.formatted_time);
+				
 			// Turn off automatic attempts to start socket
 			clearInterval(socketTimer);
 		
@@ -193,6 +193,7 @@ $(document).ready(function() {
 				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
 				data.message = "Connection with server interrupted.";
 				showMessage(data, "status_template");
+				console.log("Connection with server interrupted: " + data.formatted_time);
 			}
 		
 			// Turn off automatic attempts to send heartbeat
@@ -217,6 +218,7 @@ $(document).ready(function() {
 				data.formatted_time = dateFormat(new Date(), 'mm/dd/yyyy hh:MM TT');
 				data.message = "Websocket error.";
 				showMessage(data, "status_template");
+				console.log("Websocket error: " + data.formatted_time);
 			}
 		}); // End of socket on error
 		
