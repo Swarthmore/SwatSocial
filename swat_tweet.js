@@ -267,9 +267,11 @@ var tweet_handler = function(tweet, config) {
 	
 			// Then replace any media links in the text 
 			// Loop through all the media entities and replace text with actual link
-			output.content.entities.media.every(function(element, index, array) {
-				output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");			
-			});
+			if (typeof output.content.entities.media != 'undefinied') {
+				output.content.entities.media.every(function(element, index, array) {
+					output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");			
+				});
+			}
 	
 			
 			// Save Tweet to database
