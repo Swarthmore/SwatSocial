@@ -95,6 +95,16 @@ header h1 {
   box-shadow: 3px 3px 10px #999999;*/
 }
 
+#inbox .success
+{
+	background-color: #65D5BA;
+	border:0px;
+}
+#inbox .error
+{
+	background-color: #E64066;
+	border:0px;
+}
 #nav {
   float: right;
   z-index: 99;
@@ -135,16 +145,6 @@ header h1 {
 	color: #FFFFFF; 
 	display:block;
 	}
-
-#inbox .success
-{
-	background-color: #65D5BA;
-	border:0px;
-}
-.error
-{
-	background-color: #E64066;
-}
 
 .status_message
 {
