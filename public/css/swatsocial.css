@@ -60,8 +60,6 @@ header button {
 	font-size:.45em;
 	border: 0px solid #FFFFFF;
 	border-radius:8px;
-	background-color: #FF4D4D;
-	background-color: #AA3355;
 	background-color: #E64066;
 
 }
@@ -130,7 +128,28 @@ header h1 {
 
 	display: block; 
 }
+.status {
+	position:relative;
+	min-height: 50px;
+	border:0px; 
+	color: #FFFFFF; 
+	display:block;
+	}
+.success
+{
+	background-color: #65D5BA;
+}
+.error
+{
+	background-color: #E64066;
+}
 
+.status_message
+{
+	position:relative;
+	margin-left:10px;
+	font-size:75%
+}
 
 .source_icons
 {

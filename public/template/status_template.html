@@ -1,9 +1,11 @@
-<div class="message status <%= type %>" id="<%= id %>" style="position:relative;min-height: 50px;background-color:#eeeeee;border:3px solid #800000">
+<div class="message status <%= type %>" id="<%= id %>">
 
-	<div style='position:absolute;top:3px;right:5px;width:50%;font-size:50%;text-align:right'><%= formatted_time %></div>
+	<div class='date_time'><%= formatted_time %></div>
 
-	<div style="position:relative;margin-left:10px;font-size:75%">
+	<div class='post'>
+		<div class='post_content'>
 		<%= message %>
+		</div>
 	</div>
 
 </div>
