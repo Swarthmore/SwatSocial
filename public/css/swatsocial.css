@@ -135,9 +135,11 @@ header h1 {
 	color: #FFFFFF; 
 	display:block;
 	}
-.success
+
+#inbox .success
 {
 	background-color: #65D5BA;
+	border:0px;
 }
 .error
 {
@@ -202,6 +204,14 @@ border-top-right-radius: 8px;
 border-bottom-right-radius: 8px;
 
 }
+
+.status .post
+{
+	background:none;
+	border:0px;
+	margin-left:0.75em;
+
+}	
 
 /*--- Begin Username Block: containing @Username, link to profile, and display name ---*/
 .username
