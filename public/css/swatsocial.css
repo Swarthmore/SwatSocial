@@ -232,6 +232,7 @@ border-bottom-right-radius: 8px;
 .post_content
 { 
 	font-size:75%;
+	word-wrap:break-word;
 	overflow-wrap: break-word;
 }
 
