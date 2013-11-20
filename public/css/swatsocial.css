@@ -232,6 +232,7 @@ border-bottom-right-radius: 8px;
 .post_content
 { 
 	font-size:75%;
+	overflow-wrap: break-word;
 }
 
 .instagram .post_content img
