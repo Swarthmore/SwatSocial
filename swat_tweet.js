@@ -259,16 +259,16 @@ var tweet_handler = function(tweet, config) {
 		if (output.matches.length > 0) {
 		
 			// First replace any URLs in the text with links to the URL
-			output.content.entities.urls.every(function(element, index, array) {
+			output.content.entities.urls.forEach(function(element, index, array) {
 				utility.update_status("Found a URL: " + element.url);
-				output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.url + "\" target=\"_blank\">" + element.url + "</a>");
+				output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");
 			});
 			
 	
 			// Then replace any media links in the text 
 			// Loop through all the media entities and replace text with actual link
 			if (typeof output.content.entities.media != 'undefined') {
-				output.content.entities.media.every(function(element, index, array) {
+				output.content.entities.media.forEach(function(element, index, array) {
 					output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");			
 				});
 			}

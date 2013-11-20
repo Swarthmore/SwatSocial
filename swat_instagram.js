@@ -22,7 +22,7 @@ var instagram_handler = function(config, instagram_update) {
 				// Pull down recent posts with matching tags
 				find_last_instagram_tag_id(config, function(tag_id) {
 					ig_request_url = "https://api.instagram.com/v1/tags/" + element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; // + "&min_tag_id=" + tag_id;
-					get_Instagram_posts(config, ig_request_url);	
+					get_Instagram_posts(config, ig_request_url, {type:"tag", value:element.object_id});	
 				});
 				break;
 			
@@ -31,7 +31,7 @@ var instagram_handler = function(config, instagram_update) {
 				
 				find_last_instagram_tag_id(config, function(tag_id) {
 					ig_request_url = "https://api.instagram.com/v1/locations/" +  element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; // + "&min_id=" + tag_id;
-					get_Instagram_posts(config, ig_request_url);							
+					get_Instagram_posts(config, ig_request_url, {type:"location", value:element.object_id});							
 				});
 				break;
 				
@@ -39,7 +39,7 @@ var instagram_handler = function(config, instagram_update) {
 				// Pull down recent posts with matching geographies	
 				find_last_instagram_tag_id(config, function(tag_id) {
 					ig_request_url = "https://api.instagram.com/v1/geographies/" +  element.object_id + "/media/recent?client_id=" + config.Instagram.instagram_client_id; // + "&min_id=" + tag_id;
-					get_Instagram_posts(config, ig_request_url);				
+					get_Instagram_posts(config, ig_request_url, {type:"geography", value:element.object_id});				
 				});
 				break;	
 				
@@ -47,7 +47,7 @@ var instagram_handler = function(config, instagram_update) {
 				// Pull down recent posts with matching user
 				find_last_instagram_tag_id(config, function(tag_id) {
 					ig_request_url = "https://api.instagram.com/v1/users/" +  element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; // + "&min_tag_id=" + tag_id;
-					get_Instagram_posts(config, ig_request_url);							
+					get_Instagram_posts(config, ig_request_url, {type:"user", value:element.object_id});							
 				});
 				
 				break;
@@ -84,7 +84,7 @@ var find_last_instagram_tag_id = function(config, callback) {
 
 
 // Request Instagram media
-var get_Instagram_posts = function(config, url, count) {
+var get_Instagram_posts = function(config, url, match_type, count) {
 
 	// If count is not provided, make it zero
 	// If count is more than 3, give up
@@ -115,6 +115,7 @@ var get_Instagram_posts = function(config, url, count) {
 					output.content = ig_posts[i];
 					output.id = ig_posts[i].id;
 					output.type = "instagram";
+					output.match = match_type;
 					output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
 					output.unixtime = ig_posts[i].created_time;
 
@@ -138,7 +139,7 @@ var get_Instagram_posts = function(config, url, count) {
 				// Try again after a short wait
 				console.log("Non-200 status when retrieving Instagram posts.  Trying again shortly.  Retry count is: " + count );
 				setTimeout( function(){ 
-						get_Instagram_posts(config, url, count+1);
+						get_Instagram_posts(config, url, match_type, count+1);
 					}
 					,3000);
 					

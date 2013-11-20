@@ -2,6 +2,13 @@
 	<div class='source_icons'>
 		<img class='user_avatar' src='<%=content.user.profile_picture %>'> <BR>
 		<img class='favicons' src='/img/instagram_icon.png' > 
+		<% 
+			if (typeof match != "undefined" && typeof match.type != "undefined" && 
+				(match.type == "location" ||  match.type == "geography" )) {
+					print ("<img class='favicons' src='/img/geo_icon.png'>");
+			}
+		%>		
+		
 	</div>
 	
 	<div class='date_time'>
@@ -22,8 +29,63 @@
 				</div>
 			</div>
 		<div class='post_caption'>
-			<%= content.caption.text %>
+			<% if(content.caption != null) {
+			 	print(content.caption.text); 
+			 }
+			 %>
 		</div>
+		
+		<div class='matches' style="clear:both;font-size:60%">
+		
+			<%
+				if (typeof match != "undefined" && typeof match.type != "undefined") {
+			
+					switch(match.type) {
+					
+						case "location":
+							print("<span id='" + content.id + "_locationmatch' class='location_match'>");
+							print("<b>Location match</b>: ");
+							if ( (typeof content.location != "undefined")  && (typeof content.location.latitude != "undefined") && (typeof content.location.longitude != "undefined") && (typeof content.location.name != "undefined")) {
+								print ("<a href='https://maps.google.com/maps?q=" + content.location.latitude + "," + content.location.longitude + "' target='_blank'>" + content.location.name + "</a>&nbsp;");
+							}
+							print("</span>");
+							break;
+							
+						case "geography":
+							print("<span id='" + content.id + "_geographymatch' class='geography_match'>");
+							print("<b>Geography match</b>: ");
+							if ( (typeof content.location != "undefined")  && (typeof content.location.latitude != "undefined") && (typeof content.location.longitude != "undefined")) {
+								print ("<a href='https://maps.google.com/maps?q=" + content.location.latitude + "," + content.location.longitude + "' target='_blank'>" + content.location.latitude + ", " + content.location.longitude + "</a>&nbsp;");
+							}
+							print("</span>");
+							break;	
+							
+						case "user":
+							print("<span id='" + content.id + "_usermatch' class='user_match'>");
+							print("<b>User match</b>: ");				
+							print(content.user.username);
+							print("</span>");
+							break;								
+
+						case "tag":
+							print("<span id='" + content.id + "_tagmatch' class='tag_match'>");
+							print("<b>Tag match</b>: ");
+							print(match.value);
+							print("</span>");
+							break;																
+							
+					}
+				
+				}
+			%>
+		
+			
+	
+		
+		
+		</div>		
+		
+		
 		<div class='clear'></div>
 	</div> 
 
