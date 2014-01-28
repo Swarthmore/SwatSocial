@@ -282,15 +282,17 @@ var tweet_handler = function(tweet, config) {
 					utility.update_status("Error saving tweet to database: " + err);
 				} else {
 					utility.update_status("Saved tweet to database");
+					utility.update_status("Tweet send out");
+					io.sockets.emit('tweet',output);
+					
+					// Flash lights on Arduino based on first matched attribute
+					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
+					arduino.send_arduino_message(config, output.id, output.matches[0].color1, output.matches[0].color2, display);				
 				}
 			});
 
-			utility.update_status("Tweet send out");
-			io.sockets.emit('tweet',output);	
+				
 
-			// Flash lights on Arduino based on first matched attribute
-			var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-			arduino.send_arduino_message(config, output.id, output.matches[0].color1, output.matches[0].color2, display);
 						
 		} else {
 			utility.update_status("Did not match anything -- not displaying");
