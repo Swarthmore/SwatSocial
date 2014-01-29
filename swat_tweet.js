@@ -21,94 +21,133 @@ var connect_to_twitter = function (config, callback) {
 
 
 
+
+
+
+
+
 var load_Twitter_search_terms = function(config, callback) {
 	
+	config.twitter_tracking_terms = [];
+	config.twitter_follow_ids = [];
+		
 	utility.update_status("Connecting to Google Doc for Twitter search terms");
-
 	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
 	
-	// Load search terms
-	socialmedia_spreadsheet.getRows( 1, function(err, row_data){
+	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
 
 		if (err) {
 			utility.update_status("Error opening Google spreadsheet: " + err);
-			return;
+			callback(err,config);
 		}
 	
-	 	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
-	 		if (err) {
-	 			utility.update_status(err);
-	 			return;
-	 		} else {
-        	utility.update_status( sheet_info.title + ' is loaded' );
-        	}
-        });
+		utility.update_status(sheet_info.title + ' is loaded' );
 	
-		utility.update_status( 'Found '+row_data.length + ' rows in Google Doc');
-		
-		config.twitter_tracking_terms = [];
-		config.twitter_follow_ids = [];
-		config.twitter_defs = [];
-		
-		
-		// Add term to twitter tracking list.  If the term starts with @ or #, drop it.
-		row_data.forEach(function(row) {
-			
-			if (row.term.charAt(0)=="@" || row.term.charAt(0)=="#" ) {
-				config.twitter_tracking_terms.push(row.term.substr(1));
-			} else {
-				config.twitter_tracking_terms.push(row.term);
-			}	
-			
-			// Look for Twitter user ID's to follow (not google-spreadsheet drops non-alphanumeric characters in column names)
-			if (row.userid) {
-				config.twitter_follow_ids.push(row.userid);	
-			}	
-			
-			// Store the entire search term row (up through the first 5 rows) to match terms, colors, and Arduino modes
-			config.twitter_defs.push(row);	
-			
-		});
-				
+		// Loop through each config sheet, pulling out the configuration information	
+		for (var sheet in sheet_info.worksheets) {
+	
+			// Skip the template sheet
+			if ( sheet_info.worksheets[sheet].title != "TEMPLATE") {
+				process_google_sheet(config, sheet_info.worksheets[sheet].title, sheet_info.worksheets[sheet])
+			}
+		}
+	
+	
+	
+		// Master list of Twitter search terms	
+		// Loop over the flavors, pulling out the Twitter search terms and follow ids
+		for (var key in config.flavors) {
+			config.twitter_tracking_terms = config.twitter_tracking_terms.concat(config.flavors[key].twitter_tracking_terms);
+			config.twitter_follow_ids = config.twitter_follow_ids.concat(config.flavors[key].twitter_follow_ids);
+		}
+	
+		// Remove duplicate values
+		config.twitter_tracking_terms = _und.uniq(config.twitter_tracking_terms);
+		config.twitter_follow_ids = _und.uniq(config.twitter_follow_ids);
+
 		utility.update_status("Twitter Tracking terms:\n" + config.twitter_tracking_terms);
-		utility.update_status("Twitter Follow IDs:\n" + config.twitter_follow_ids);
-	
-		callback(null,config);
-		
-	})
-	
-	// Load Blacklist users
-	socialmedia_spreadsheet.getRows( 2, function(err, bl_row_data){
-	
-		if(err) {
-			utility.update_status("Could not connect to Twitter Blacklist " + err);
-		}
-	
-		socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
-	 		if (err) {
-	 			utility.update_status(err);
-	 			return;
-	 		} else {
-        	utility.update_status( sheet_info.title + ' is loaded' );
-        	}
-        });
-	
-		utility.update_status( 'Found '+bl_row_data.length + ' rows in Google Doc');
-		
-		config.twitter_blacklist = [];
-		
-		bl_row_data.forEach(function(row) {
-			config.twitter_blacklist.push(row.user);
-		});	
-		
-		utility.update_status("Twitter Blacklisted users:\n" + config.twitter_blacklist);
+		utility.update_status("Twitter Follow IDs:\n" + config.twitter_follow_ids);	
+
+		callback(null,config);	
 	});
-	
-	
 }
 
 
 
+
+
+
+// Given a flavor name and the corresponding spreadsheet, pull out all the data	
+function process_google_sheet(config, flavor, spreadsheet) {
+
+	utility.update_status("Processing \"" + spreadsheet.title + "\"");
+	
+	// Configure the flavor
+	config.flavors[flavor].twitter_tracking_terms = [];
+	config.flavors[flavor].twitter_follow_ids = [];
+	config.flavors[flavor].twitter_defs = [];
+	config.flavors[flavor].blacklist = [];
+	
+	spreadsheet.getRows(0, function(err, row_data){
+	
+		// Add term to twitter tracking list.  If the term starts with @ or #, drop it.
+		for (var i in row_data) {
+			getTwitterTermsFromRow(config, flavor, row_data[i])	
+		}
+	});
+		
+}	
+	
+	
+	
+	
+
+// Given a flavor and a Google spreadsheet row, pull the Twitter terms
+function getTwitterTermsFromRow(config, flavor, row) {
+	
+	// Twitter tracking terms
+	if (row.twitterterm) {
+	
+		if (row.twitterterm.charAt(0)=="@" || row.twitterterm.charAt(0)=="#" ) {
+			config.flavors[flavor].twitter_tracking_terms.push(row.twitterterm.substr(1));
+			utility.update_status("Found a term: " + row.twitterterm.substr(1));
+		} else {
+			config.flavors[flavor].twitter_tracking_terms.push(row.twitterterm);
+		}	
+				
+		// Store the entire search term to match terms, colors, and Arduino modes
+		config.flavors[flavor].twitter_defs.push({
+			type: "term",
+			match: row.twitterterm,
+			color1: row.twittercolor1,	
+			color2: row.twittercolor2,
+			displaymode: row.twitterdisplaymode 
+			}
+		);	
+	}	
+
+	
+	// Twitter follow users
+	if (row.twitteruserid) {
+		config.flavors[flavor].twitter_follow_ids.push(row.twitteruserid);	
+				
+		// Store the entire search term to match terms, colors, and Arduino modes
+		config.flavors[flavor].twitter_defs.push({
+			type: "user",
+			match: row.twitteruserid,
+			color1: row.twittercolor1,	
+			color2: row.twittercolor2,
+			displaymode: row.twitterdisplaymode 
+			}
+		);			
+	}	
+
+	// Twitter lacklist
+	if (row.twitterignore) {
+		config.flavors[flavor].blacklist.push(row.twitterignore);
+	}
+		
+}
 
 
 

@@ -15,7 +15,8 @@ var http = require('http'),
   	swat_instagram = require("./swat_instagram"),
   	mongo = require('mongodb'),
   	format = require('util').format,
-  	utility = require("./utility");
+  	utility = require("./utility"),
+  	GoogleSpreadsheet = require("google-spreadsheet");
 
 var twit;
 var config;
@@ -42,6 +43,10 @@ function load_config() {
 		function(callback) {
 			connect_to_db(config, callback);
 		},
+				
+		function(callback) {
+			load_flavors(config, callback);
+		},			
 			
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
@@ -71,6 +76,40 @@ function load_config_file(config_file, callback) {
 		callback(err, config);
 	});
 }
+
+
+
+var load_flavors = function(config, callback) {
+
+	config.flavors = [];
+
+	utility.update_status("Connecting to Google Doc for flavor information");
+	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
+	
+	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
+
+		if (err) {
+			console.log("Error opening Google spreadsheet: " + err);
+			callback(err, config);
+		}
+	
+		console.log(sheet_info.title + ' is loaded' );
+	
+		// Loop through each config sheet, pulling out the configuration information	
+		for (var sheet in sheet_info.worksheets) {
+	
+			// Skip the template sheet
+			if ( sheet_info.worksheets[sheet].title != "TEMPLATE") {
+				// Add the flavor to the config
+				config.flavors[sheet_info.worksheets[sheet].title] = {};
+			}
+		}	
+		
+		callback(err, config);
+	});
+}
+
+
 
 function start_server(config_file, callback) {
 	fileServer = new static.Server('./public', { cache: 1 });
