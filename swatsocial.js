@@ -16,6 +16,7 @@ var http = require('http'),
   	mongo = require('mongodb'),
   	format = require('util').format,
   	utility = require("./utility"),
+  	arduino = require("./swat_arduino"),
   	GoogleSpreadsheet = require("google-spreadsheet");
 
 var twit;
@@ -46,8 +47,11 @@ function load_config() {
 				
 		function(callback) {
 			load_flavors(config, callback);
+		},	
+				
+		function(callback) {
+			arduino.arduino_setup(config, callback);
 		},			
-			
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
 		},
@@ -57,7 +61,9 @@ function load_config() {
 		},
 	
 		function(callback) {
-			swat_tweet.start_tracking_Twitter_terms(config, callback);
+			setTimeout(function() {
+					swat_tweet.start_tracking_Twitter_terms(config, callback)},
+				4000);
 		},
 		
 		function(callback) {
@@ -93,7 +99,7 @@ var load_flavors = function(config, callback) {
 			callback(err, config);
 		}
 	
-		console.log(sheet_info.title + ' is loaded' );
+		utility.update_status(sheet_info.title + ' is loaded' );
 	
 		// Loop through each config sheet, pulling out the configuration information	
 		for (var sheet in sheet_info.worksheets) {
