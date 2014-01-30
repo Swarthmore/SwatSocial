@@ -9,6 +9,7 @@ var http = require('http'),
 var arduino_setup = function(config, callback) {
 
 	utility.update_status("Connecting to Google Doc for Arduino details");
+	utility.update_status(config);
 	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
 	
 	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
@@ -17,19 +18,22 @@ var arduino_setup = function(config, callback) {
 			utility.update_status("Error opening Google spreadsheet: " + err);
 			callback(err,config);
 		}
-	
-		
+
 		// Loop through each config sheet, pulling out the configuration information	
 		for (var i in sheet_info.worksheets) {
 	
 			utility.update_status("Looking in " + sheet_info.worksheets[i].title  + " for Arduino information.");	
-
+			console.log(sheet_info.worksheets[i]);
 	
 			// Skip the template sheet
-			if ( sheet_info.worksheets[i].title != "TEMPLATE") {
-			
+			if (sheet_info.worksheets[i].title != "TEMPLATE") {
+				
+				var flavor = sheet_info.worksheets[i].title;
+					
 				// Look at the Arduino IP field of the first row of the flavor worksheet to see if it present
-				sheet_info.worksheets[i].getRows(0, function(err, row_data) {
+				sheet_info.worksheets[i].getRows(i, function(err, row_data) {
+				
+					console.log("Sheet title is \"" + this.title + "\"");
 				
 					if (row_data[0].arduinoip) {
 						utility.update_status(sheet_info.worksheets[i].title + ' has Arduino IP: ' + row_data[0].arduinoip);
