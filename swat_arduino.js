@@ -18,34 +18,62 @@ var arduino_setup = function(config, callback) {
 			callback(err,config);
 		}
 
-		// Loop through each config sheet, pulling out the configuration information	
-		for (var i in sheet_info.worksheets) {
+
+
+		// Loop through each config sheet, pulling out the arduino configuration information	
+		async.each(
+		
+			sheet_info.worksheets, 	// Collection to iterate over
+			
+			function(sheet, callback) {
+				process_google_sheet(config, sheet.title, sheet, callback);
+			}, 
+			
+			function(err){
+							
+				callback(null,config);	
+   
+			}	// End of async.each final function
+			
+		); // End of async.each
+	});
+}
+
+
+
+
+
+// Given a flavor name and the corresponding spreadsheet, look for the Arduino IP and (if present) save to config 
+function process_google_sheet(config, flavor, spreadsheet, callback) {
+
+	// Don't process the template
+	if (flavor == "TEMPLATE") {callback();return;}
+
+	utility.update_status("Looking for Arduino data for \"" + spreadsheet.title + "\" flavor");
 	
-			utility.update_status("Looking in " + sheet_info.worksheets[i].title  + " for Arduino information.");	
-			// Skip the template sheet
-			if (sheet_info.worksheets[i].title != "TEMPLATE") {
-					
-				// Look at the Arduino IP field of the first row of the flavor worksheet to see if it present
-				sheet_info.worksheets[i].getRows(i, function(err, row_data) {
-				
-					if (row_data[0].arduinoip) {
-						utility.update_status(sheet_info.worksheets[i].title + ' has Arduino IP: ' + row_data[0].arduinoip);
-						config.flavors[sheet_info.worksheets[i].title].arduino_ip = row_data[0].arduinoip;
-					} else {
-						utility.update_status(sheet_info.worksheets[i].title + ' does not have an Arduino IP');
-						config.flavors[sheet_info.worksheets[i].title].arduino_ip = false;
-					}
-	
-				});
-			}
+	spreadsheet.getRows(0, function(err, row_data){
+
+		if (row_data && row_data.length > 0 && row_data[0].arduinoip) {
+			utility.update_status(flavor + ' has Arduino IP: ' + row_data[0].arduinoip);
+			config.flavors[flavor].arduino_ip = row_data[0].arduinoip;
+		} else {
+			utility.update_status(flavor + ' does not have an Arduino IP');
+			config.flavors[flavor].arduino_ip = false;
 		}
-		
-		callback(err, callback);
-		
-		
+	
+		callback();	// For async each -- do when all done getting data from the rows
 	});
 
-}
+		
+}	
+
+
+
+
+
+
+
+
 
 
 

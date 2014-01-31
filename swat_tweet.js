@@ -100,7 +100,7 @@ function process_google_sheet(config, flavor, spreadsheet, callback) {
 	spreadsheet.getRows(0, function(err, row_data){
 
 		// Twitter geolocation
-		if (["Yes", "yes", "Y", "y", "1"].indexOf(row_data[0].twittergeoenabled) > -1 ) {
+		if (row_data && row_data.length > 0 && ["Yes", "yes", "Y", "y", "1"].indexOf(row_data[0].twittergeoenabled) > -1 ) {
 			config.flavors[flavor].twitter_geo = true;
 		} else {
 			config.flavors[flavor].twitter_geo = false;
@@ -223,11 +223,17 @@ var tweet_handler = function(tweet, config) {
 		if (typeof tweet === 'undefined' || typeof tweet.text == 'undefined' || tweet.text == null) {return;}
 		utility.update_status("Got a tweet: " + tweet.text);
 		
+		// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
+		// It is common across all the flavors, so we can update the flavor list of the post in MongoDB
+		// without having to have duplicate Tweets
+		var mongo_id = new BSON.ObjectID();
+		
 		
 		// Loop through each flavor looking for matches
 		for (var i in config.flavors) {
 		
 			var output = {};
+			output._id = mongo_id;		// This is common across all the flavors
 			output.content = tweet;
 			output.id = tweet.id;
 			output.type = "tweet";
@@ -347,9 +353,8 @@ var tweet_handler = function(tweet, config) {
 				}
 	
 			
-				// Save Tweet to database
-				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
-				output._id = new BSON.ObjectID();
+
+
 				
 				utility.update_status("Tweet send out");		
 				// Only send message to clients listening on this flavor
@@ -360,35 +365,86 @@ var tweet_handler = function(tweet, config) {
 					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
 					arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
 				}			
-				
-				
-				var _id = config.db.collection('posts').insert(output, function(err, docs) {
-					if (err) {
-						utility.update_status("Error saving tweet to database: " + err);
-					} else {
-						utility.update_status("Saved tweet to database");
-					}
-				});
-
-				
-
+			
+				// Save Tweet to database
+				save_tweet(config, output, i);
 						
 			} else {
+			
+				// Tweet did not match any terms, users, URL, locations, etc.  Don't send out or save.
+				
 				utility.update_status("Did not match anything -- not displaying");
 			
+				// Print out a note if this is probably due to location
 				if (typeof tweet.place!='undefined' && tweet.place !== null &&
 					(tweet.place.name == "New Jersey" || tweet.place.name == "Pennsylvania" || tweet.place.full_name.indexOf(", PA") != -1)) {
 					utility.update_status("Probably because place is PA or NJ");
-				} else {
-					//utility.update_status(tweet);
-					//utility.update_status("--------------\n\n");
-				}
+				} 
 			}
 			
-		}
+		} // End of looping through the flavors
 
 } // End of tweet_handler
 
+
+
+
+
+
+// Save Tweet to database.
+// Only one Tweet is saved in the database no matter how many flavors match.
+// If this is the first time a Tweet is being saved, save it with a flavors array of a single flavor element
+// If another flavor matches this Tweet, add the new flavor to the existing document
+var save_tweet = function(config, output, flavor) {
+
+	// Save Tweet to database		
+	// First check to see if Mongo _id exists already.  If not, save the Tweet. If so, add this flavor to the
+	// flavor list
+	
+	utility.update_status("Saving Tweet '_id':" +  output._id);
+	
+	config.db.collection('posts').find({_id: output._id}).toArray(function(err, results) {
+		
+		if (err) { 
+			utility.update_status("Error checking existing Tweets in the database: " + err);
+			
+		} else { 
+
+			console.log("Results of find ");
+			console.log(results);
+
+			if (results.length > 0) {
+				// Found a matching _id in the database.  Update, by adding the current flavor to the flavor list
+				console.log("Found a matching id in the database, add current flavor to Tweet id " + output._id);
+				
+				var _id = config.db.collection('posts').update({'_id': output._id}, { $push: { 'flavors': flavor }}, function(err, object) {
+					  if (err){
+						  utility.update_status("Error trying to update flavors for Tweet ID " + output.id + "\n" + err);  
+					  } else {
+						  utility.update_status("Updated flavors for Tweet ID " + output.id);
+					  }
+				});
+			
+			} else {
+			
+				// This Tweet hasn't yet been saved to the database.  Save it with the initial flavor listing
+				console.log("No matching id in the database, save a new entry for " + flavor + " flavor to Tweet id " + output._id);
+				output.flavors = [flavor];
+				var _id = config.db.collection('posts').insert(output, function(err, object) {
+					  if (err){
+						  utility.update_status("Error trying to save Tweet ID " + output.id + " to the database for flavor " + flavor + "\n" + err);  
+					  } else {
+						  utility.update_status("Saved Tweet ID " + output.id + " to the database for flavor " + flavor);
+					  }
+				});	
+
+			} 
+		} // End of saving Tweets to the database
+		
+	}); // End of Tweet database operations
+
+
+} // End of save_tweet
 
 
 
