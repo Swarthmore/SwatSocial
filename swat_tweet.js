@@ -228,6 +228,12 @@ var tweet_handler = function(tweet, config) {
 		// without having to have duplicate Tweets
 		var mongo_id = new BSON.ObjectID();
 		
+		// Queue for handling database race conditions
+		var flavor = "";
+		var callback = "";
+		var q = async.queue(save_tweet(config, output, flavor, callback), 1);
+		
+
 		
 		// Loop through each flavor looking for matches
 		for (var i in config.flavors) {
@@ -367,7 +373,11 @@ var tweet_handler = function(tweet, config) {
 				}			
 			
 				// Save Tweet to database
-				save_tweet(config, output, i);
+				//save_tweet(config, output, i);
+				
+				q.push(config, output, i, function (err) {
+    				console.log('finished processing db save');
+				});
 						
 			} else {
 			
@@ -395,7 +405,7 @@ var tweet_handler = function(tweet, config) {
 // Only one Tweet is saved in the database no matter how many flavors match.
 // If this is the first time a Tweet is being saved, save it with a flavors array of a single flavor element
 // If another flavor matches this Tweet, add the new flavor to the existing document
-var save_tweet = function(config, output, flavor) {
+var save_tweet = function(config, output, flavor, callback) {
 
 	// Save Tweet to database		
 	// First check to see if Mongo _id exists already.  If not, save the Tweet. If so, add this flavor to the
@@ -407,6 +417,7 @@ var save_tweet = function(config, output, flavor) {
 		
 		if (err) { 
 			utility.update_status("Error checking existing Tweets in the database: " + err);
+			callback();
 			
 		} else { 
 
@@ -420,8 +431,10 @@ var save_tweet = function(config, output, flavor) {
 				var _id = config.db.collection('posts').update({'_id': output._id}, { $push: { 'flavors': flavor }}, function(err, object) {
 					  if (err){
 						  utility.update_status("Error trying to update flavors for Tweet ID " + output.id + "\n" + err);  
+						  callback();
 					  } else {
 						  utility.update_status("Updated flavors for Tweet ID " + output.id);
+						  callback();
 					  }
 				});
 			
@@ -433,8 +446,10 @@ var save_tweet = function(config, output, flavor) {
 				var _id = config.db.collection('posts').insert(output, function(err, object) {
 					  if (err){
 						  utility.update_status("Error trying to save Tweet ID " + output.id + " to the database for flavor " + flavor + "\n" + err);  
+						  callback();
 					  } else {
 						  utility.update_status("Saved Tweet ID " + output.id + " to the database for flavor " + flavor);
+						  callback();
 					  }
 				});	
 
