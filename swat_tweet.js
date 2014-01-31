@@ -44,31 +44,39 @@ var load_Twitter_search_terms = function(config, callback) {
 		utility.update_status(sheet_info.title + ' is loaded' );
 	
 		// Loop through each config sheet, pulling out the configuration information	
-		for (var sheet in sheet_info.worksheets) {
+		async.each(
+		
+			sheet_info.worksheets, 	// Collection to iterate over
+			
+			function(sheet, callback) {
+				process_google_sheet(config, sheet.title, sheet, callback);
+			}, 
+			
+			function(err){
+							
+				// Master list of Twitter search terms	
+				// Loop over the flavors, pulling out the Twitter search terms and follow ids
+				for (var key in config.flavors) {
+					config.twitter_tracking_terms = config.twitter_tracking_terms.concat(config.flavors[key].twitter_tracking_terms);
+					config.twitter_follow_ids = config.twitter_follow_ids.concat(config.flavors[key].twitter_follow_ids);
+				}
 	
-			// Skip the template sheet
-			if ( sheet_info.worksheets[sheet].title != "TEMPLATE") {
-				process_google_sheet(config, sheet_info.worksheets[sheet].title, sheet_info.worksheets[sheet])
-			}
-		}
-	
-		// Master list of Twitter search terms	
-		// Loop over the flavors, pulling out the Twitter search terms and follow ids
-		for (var key in config.flavors) {
-			config.twitter_tracking_terms = config.twitter_tracking_terms.concat(config.flavors[key].twitter_tracking_terms);
-			config.twitter_follow_ids = config.twitter_follow_ids.concat(config.flavors[key].twitter_follow_ids);
-		}
-	
-		// Remove duplicate values
-		config.twitter_tracking_terms = _und.uniq(config.twitter_tracking_terms);
-		config.twitter_follow_ids = _und.uniq(config.twitter_follow_ids);
+				// Remove duplicate values
+				config.twitter_tracking_terms = _und.uniq(config.twitter_tracking_terms);
+				config.twitter_follow_ids = _und.uniq(config.twitter_follow_ids);
 
-		utility.update_status("Twitter Tracking terms:\n" + config.twitter_tracking_terms);
-		utility.update_status("Twitter Follow IDs:\n" + config.twitter_follow_ids);	
+				utility.update_status("Twitter Tracking terms:\n" + config.twitter_tracking_terms);
+				utility.update_status("Twitter Follow IDs:\n" + config.twitter_follow_ids);	
 
-		callback(null,config);	
-	});
-}
+				callback(null,config);	
+   
+			}	// End of async.each final function
+			
+		); // End of async.each
+		
+	}); // end of socialmedia_spreadsheet.getInfo
+	
+} // end of load_Twitter_search_terms
 
 
 
@@ -76,23 +84,37 @@ var load_Twitter_search_terms = function(config, callback) {
 
 
 // Given a flavor name and the corresponding spreadsheet, pull out all the data	
-function process_google_sheet(config, flavor, spreadsheet) {
+function process_google_sheet(config, flavor, spreadsheet, callback) {
+
+	// Don't process the template
+	if (flavor == "TEMPLATE") {callback();return;}
 
 	utility.update_status("Processing \"" + spreadsheet.title + "\"");
-	
+
 	// Configure the flavor
 	config.flavors[flavor].twitter_tracking_terms = [];
 	config.flavors[flavor].twitter_follow_ids = [];
 	config.flavors[flavor].twitter_defs = [];
-	config.flavors[flavor].blacklist = [];
-	
+	config.flavors[flavor].twitter_blacklist = [];
+
 	spreadsheet.getRows(0, function(err, row_data){
-	
+
+		// Twitter geolocation
+		if (["Yes", "yes", "Y", "y", "1"].indexOf(row_data[0].twittergeoenabled) > -1 ) {
+			config.flavors[flavor].twitter_geo = true;
+		} else {
+			config.flavors[flavor].twitter_geo = false;
+		}
+
+
 		// Add term to twitter tracking list.  If the term starts with @ or #, drop it.
 		for (var i in row_data) {
 			getTwitterTermsFromRow(config, flavor, row_data[i])	
 		}
+	
+		callback();	// For async each -- do when all done getting data from the rows
 	});
+
 		
 }	
 	
@@ -115,7 +137,7 @@ function getTwitterTermsFromRow(config, flavor, row) {
 				
 		// Store the entire search term to match terms, colors, and Arduino modes
 		config.flavors[flavor].twitter_defs.push({
-			type: "term",
+			match_type: "term",
 			match: row.twitterterm,
 			color1: row.twittercolor1,	
 			color2: row.twittercolor2,
@@ -131,7 +153,7 @@ function getTwitterTermsFromRow(config, flavor, row) {
 				
 		// Store the entire search term to match terms, colors, and Arduino modes
 		config.flavors[flavor].twitter_defs.push({
-			type: "user",
+			match_type: "user",
 			match: row.twitteruserid,
 			color1: row.twittercolor1,	
 			color2: row.twittercolor2,
@@ -142,15 +164,10 @@ function getTwitterTermsFromRow(config, flavor, row) {
 
 	// Twitter blacklist
 	if (row.twitterignore) {
-		config.flavors[flavor].blacklist.push(row.twitterignore);
+		config.flavors[flavor].twitter_blacklist.push(row.twitterignore);
 	}
 	
-	// Twitter geolocation
-	if (["Yes", "yes", "Y", "y", "1"].indexOf(row.twittergeoenabled) > -1 ) {
-		config.flavors[flavor].twitter_geo = true;
-	} else {
-		config.flavors[flavor].twitter_geo = false;
-	}
+
 		
 }
 
@@ -168,7 +185,7 @@ var start_tracking_Twitter_terms = function(config, callback) {
 	utility.update_status("Setting up tracking terms for Twitter.");
 	console.log(config.twitter_tracking_terms.join(','));
 	console.log(config.twitter_follow_ids.join(','));
-
+	console.log(config.flavors);
 
 	if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.destroy;} // Destroy any existing streams
 	twit.stream('statuses/filter', {
@@ -206,17 +223,19 @@ var tweet_handler = function(tweet, config) {
 		if (typeof tweet === 'undefined' || typeof tweet.text == 'undefined' || tweet.text == null) {return;}
 		utility.update_status("Got a tweet: " + tweet.text);
 		
-		var output = {};
-		output.content = tweet;
-		output.id = tweet.id;
-		output.type = "tweet";
-		output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
-		output.unixtime = moment(tweet.created_at).format("X");
-		output.matches = [];
-		
 		
 		// Loop through each flavor looking for matches
 		for (var i in config.flavors) {
+		
+			var output = {};
+			output.content = tweet;
+			output.id = tweet.id;
+			output.type = "tweet";
+			output.formatted_time = moment(tweet.created_at).format("M/D/YYYY h:mm:ss A");
+			output.unixtime = moment(tweet.created_at).format("X");
+			output.matches = [];
+		
+			utility.update_status("Checking the tweet for: " + i + " flavor");
 		
 			// If the user is on the blacklist, exit
 			if (config.flavors[i].twitter_blacklist.indexOf(tweet.user.screen_name) > -1) {
@@ -230,7 +249,7 @@ var tweet_handler = function(tweet, config) {
 			config.flavors[i].twitter_defs.every(function(r, index, array) {
 		
 				// Look for a user match
-				if (r.type == "user" && tweet.user.id == r.match) {
+				if (r.match_type == "user" && tweet.user.id == r.match) {
 					utility.update_status("Matched user: " + tweet.user.screen_name);
 					
 					var match = {
@@ -245,7 +264,8 @@ var tweet_handler = function(tweet, config) {
 
 				
 				// See if it matched a search term (make sure there isn't an @ or # in front
-				if (r.type == "term") {
+				if (r.match_type == "term") {
+				
 					var term_location = tweet.text.toLowerCase().indexOf(r.match)
 					if (term_location != -1) {
 				
@@ -268,7 +288,7 @@ var tweet_handler = function(tweet, config) {
 			
 			
 					// See if there is a search term match in a URL
-				if (r.type="term" && typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(r.match) != -1) {
+				if (r["type"]="term" && typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(r.match) != -1) {
 								
 					utility.update_status("Matched search term " + r.match + " in URL:");
 					utility.update_status(tweet.entities.urls);
@@ -310,7 +330,7 @@ var tweet_handler = function(tweet, config) {
 			
 			// Did we find a match?  If so, send it to the listeners
 			if (output.matches.length > 0) {
-		
+			
 				// First replace any URLs in the text with links to the URL
 				output.content.entities.urls.forEach(function(element, index, array) {
 					utility.update_status("Found a URL: " + element.url);
@@ -330,19 +350,23 @@ var tweet_handler = function(tweet, config) {
 				// Save Tweet to database
 				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
 				output._id = new BSON.ObjectID();
+				
+				utility.update_status("Tweet send out");		
+				// Only send message to clients listening on this flavor
+				io.sockets.in(i).emit('tweet',output);
+	
+				// If want to use Arduino, flash lights on Arduino based on first matched attribute
+				if (config.flavors[i].arduino_ip) {
+					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
+					arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
+				}			
+				
+				
 				var _id = config.db.collection('posts').insert(output, function(err, docs) {
 					if (err) {
 						utility.update_status("Error saving tweet to database: " + err);
 					} else {
 						utility.update_status("Saved tweet to database");
-						utility.update_status("Tweet send out");
-						io.sockets.emit('tweet',output);
-					
-						// If want to use Arduino, flash lights on Arduino based on first matched attribute
-						if (config.flavors[sheet_info.worksheets[i].title].arduino_ip) {
-							var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-							arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
-						}			
 					}
 				});
 
@@ -356,8 +380,8 @@ var tweet_handler = function(tweet, config) {
 					(tweet.place.name == "New Jersey" || tweet.place.name == "Pennsylvania" || tweet.place.full_name.indexOf(", PA") != -1)) {
 					utility.update_status("Probably because place is PA or NJ");
 				} else {
-					utility.update_status(tweet);
-					utility.update_status("--------------\n\n");
+					//utility.update_status(tweet);
+					//utility.update_status("--------------\n\n");
 				}
 			}
 			

@@ -114,7 +114,7 @@ $(document).ready(function() {
 
 	function start_ws() {
 
-		socket = io.connect('http://23.23.177.220', {
+		socket = io.connect('',{
 			'reconnect': true,
   			'reconnection delay': 500,
   			'max reconnection attempts': Infinity
@@ -157,6 +157,10 @@ $(document).ready(function() {
 	
 		// When socket is opened, display notification message
 		socket.on('connect', function() { 
+		
+			// Set up the flavor based on the URL
+			var path = window.location.pathname.substring(1);	// Get the path minus the initial slash
+			socket.emit('flavor', path);
 			
 			// Add a connection status message 
 			// Remove all other status messages.  

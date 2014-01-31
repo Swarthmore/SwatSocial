@@ -61,9 +61,7 @@ function load_config() {
 		},
 	
 		function(callback) {
-			setTimeout(function() {
-					swat_tweet.start_tracking_Twitter_terms(config, callback)},
-				4000);
+			swat_tweet.start_tracking_Twitter_terms(config, callback);
 		},
 		
 		function(callback) {
@@ -97,6 +95,7 @@ var load_flavors = function(config, callback) {
 		if (err) {
 			console.log("Error opening Google spreadsheet: " + err);
 			callback(err, config);
+			return;
 		}
 	
 		utility.update_status(sheet_info.title + ' is loaded' );
@@ -147,6 +146,7 @@ function handler (request, response) {
 	var data = "";
 	
 	if (request.method == "GET") {
+		
 		if (request.url.indexOf("/instagram_subscription") == 0) {
 	
 			// If this is an instagram callback, just send back the hub challenge
@@ -159,7 +159,14 @@ function handler (request, response) {
 				response.end();
 			}
 			
+		} else if (_und.keys(config.flavors).indexOf(  url.parse(request.url).pathname.substring(1) ) > -1  ) {
+			// The URL requested (minus the initial slash) is one of the flavors -- serve up the index page
+			utility.update_status("Requested flavor: " + url.parse(request.url).pathname.substring(1));
+			request.url = "/"
+			fileServer.serve(request, response);
+	
 		} else {
+			// Not a special request, so serve up the file
 			fileServer.serve(request, response);
 		}
 		
@@ -210,6 +217,16 @@ io.sockets.on('connection', function(socket) {
 	last_posts(10, function(post) {
 		socket.emit(post.type, post);
 	});
+	
+	// Use the flavor to set the "room" to join
+	socket.on('flavor', function(flavor) {
+		// Check to see if flavor is in an existing room. If not, use the default room
+		 if (_und.keys(config.flavors).indexOf(flavor) == -1 ) {
+		 	flavor = "default";
+		 }
+        socket.join(flavor);
+        utility.update_status("New client joined flavor " + flavor);
+    });
 	
 		
 	socket.on('load_history', function (data) {
