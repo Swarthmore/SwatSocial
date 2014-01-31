@@ -33,7 +33,9 @@ var tweet_template;
 var instagram_template;
 var socket;
 
-
+// Set up the flavor based on the URL
+var flavor = window.location.pathname.substring(1);	// Get the path minus the initial slash
+			
 
 $(document).ready(function() {
 	start_ws();		// Start web sockets	
@@ -103,11 +105,11 @@ $(document).ready(function() {
 	}
 
 	function load_last_posts() {
-		socket.emit('load_history', {});
+		socket.emit('load_history', {flavor: flavor});
 	}
 
 	function load_previous_posts(last_id) {
-		socket.emit('load_previous_posts', {id:last_id, limit:10});
+		socket.emit('load_previous_posts', {id:last_id, limit:10, flavor: flavor});
 	}
 
 
@@ -158,9 +160,7 @@ $(document).ready(function() {
 		// When socket is opened, display notification message
 		socket.on('connect', function() { 
 		
-			// Set up the flavor based on the URL
-			var path = window.location.pathname.substring(1);	// Get the path minus the initial slash
-			socket.emit('flavor', path);
+			socket.emit('flavor', flavor);
 			
 			// Add a connection status message 
 			// Remove all other status messages.  

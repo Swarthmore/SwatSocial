@@ -213,10 +213,7 @@ io.sockets.on('connection', function(socket) {
 
 	utility.update_status("Got a socket connection");
 		
-	// Send last posts to client
-	last_posts(10, function(post) {
-		socket.emit(post.type, post);
-	});
+
 	
 	// Use the flavor to set the "room" to join
 	socket.on('flavor', function(flavor) {
@@ -226,13 +223,19 @@ io.sockets.on('connection', function(socket) {
 		 }
         socket.join(flavor);
         utility.update_status("New client joined flavor " + flavor);
+        
+       	// Send last posts to client
+		last_posts(10, flavor, function(post) {
+			socket.emit(post.type, post);
+		}); 
+        
     });
 	
 		
 	socket.on('load_history', function (data) {
 		utility.update_status("Client requested history");
 			// Send last posts to client
-			last_posts(10, function(post) {
+			last_posts(10, data.flavor, function(post) {
 				socket.emit(post.type, post);	
 			});
 	});		
@@ -240,7 +243,7 @@ io.sockets.on('connection', function(socket) {
 	socket.on('load_previous_posts', function (data) {
 		utility.update_status("Client requested " + data.limit + " previous posts, starting from " + data.id);
 			// Send previous posts to client
-			previous_posts(data, function(post) {
+			previous_posts(data, data.flavor, function(post) {
 				post.type += "_previous";
 				socket.emit(post.type, post);	
 			});
@@ -259,10 +262,10 @@ io.sockets.on('connection', function(socket) {
 
 
 // Get the last n posts
-function last_posts(n, callback) {
+function last_posts(n, f, callback) {
 
-	utility.update_status("Retrieving last " + n + " posts");
-	config.db.collection('posts').find({}).sort({unixtime:-1}).limit(n).toArray(
+	utility.update_status("Retrieving last " + n + " posts for flavor " + f);
+	config.db.collection('posts').find({flavor:f}).sort({unixtime:-1}).limit(n).toArray(
 	function(err, docs) {
 		docs.reverse(); // Want most recent sent last
 		docs.forEach(function(doc) {
@@ -276,11 +279,11 @@ function last_posts(n, callback) {
 
 
 // Get the last n posts
-function previous_posts(data, callback) {
+function previous_posts(data, f, callback) {
 
 	utility.update_status("Retrieving " + data.limit + " posts, starting at post ID "  + data.id);
 	var o_id = new BSON.ObjectID(data.id);
-	config.db.collection('posts').find({ _id: { $lt: o_id } }).sort({unixtime:-1}).limit(data.limit).toArray(
+	config.db.collection('posts').find({ _id: { $lt: o_id }, flavor:f}).sort({unixtime:-1}).limit(data.limit).toArray(
 	function(err, docs) {
 		docs.forEach(function(doc) {
 			callback(doc);
