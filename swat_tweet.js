@@ -354,7 +354,6 @@ var tweet_handler = function(tweet, config) {
 				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
 				output._id = new BSON.ObjectID();
 
-
 				// Only send message to clients listening on this flavor
 				utility.update_status("Tweet send out");	
 				io.sockets.in(i).emit('tweet',output);
