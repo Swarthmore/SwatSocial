@@ -52,6 +52,15 @@ function load_config() {
 		function(callback) {
 			arduino.arduino_setup(config, callback);
 		},			
+		
+		function(callback) {
+			swat_instagram.load_Instagram_search_terms(config, callback);
+		},
+		
+		function(callback) {
+			swat_instagram.intialize_subscriptions(config, callback);
+		},
+		
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
 		},

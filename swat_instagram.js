@@ -15,7 +15,7 @@ var BSON = mongo.BSONPure;
 var load_Instagram_search_terms = function(config, callback) {
 	
 	config.instagram_tags = [];
-	config.locations = [];
+	config.instagram_locations = [];
 		
 	utility.update_status("Connecting to Google Doc for Instagram search parameters");
 	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
@@ -51,8 +51,8 @@ var load_Instagram_search_terms = function(config, callback) {
 				config.instagram_tags = _und.uniq(config.instagram_tags);
 				config.instagram_locations = _und.uniq(config.instagram_locations);
 
-				utility.update_status("Instagram tags:\n" + config.instagram_tags);	
-				utility.update_status("Instagram locations:\n" + config.instagram_locations);	
+				utility.update_status("Instagram tags: " + config.instagram_tags);	
+				utility.update_status("Instagram locations: " + config.instagram_locations);	
 
 				callback(null,config);	
    
@@ -126,38 +126,6 @@ function getInstagramTermsFromRow(config, flavor, row) {
 	}
 		
 }
-
-
-
-
-
-
-
-
-// Begin tracking Instagram tags, locations, and geographies
-
-var setup_Instagram_Real_Time_API = function(config, callback) {
-
-	utility.update_status("Setting up Instagram tags.");
-	
-	console.log(config.instagram_tags.join(','));
-	console.log(config.instagram_locations.join(','));
-	
-	
-	curl -X DELETE 'https://api.instagram.com/v1/subscriptions?client_secret=CLIENT-SECRET&object=all&client_id=CLIENT-ID'
-    
-    callback(null,config);
-
-}
-
-
-
-
-
-
-
-
-
 
 
 
@@ -246,7 +214,7 @@ var get_Instagram_posts = function(config, url, match_type, count) {
 				// Loop through all the posts, processing each one
 				for (var i=ig_posts.length-1; i>=0; i=i-1) {
 					process_Instagram_post(config, posts[i], match_type);			
-				} /
+				} 
 			
 			} else {
 			
@@ -280,44 +248,44 @@ var process_Instagram_post = function(config, post, match_type) {
 		// Loop through all the terms set up in the Google Doc looking for a match
 		config.flavors[i].twitter_defs.every(function(r, index, array) {
 
-				var output = {};
-				output.content = ig_posts[i];
-				output.id = ig_posts[i].id;
-				output.type = "instagram";
-				output.match = match_type;
-				output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
-				output.unixtime = ig_posts[i].created_time;
-			
-
-				// Add the flavor to the message
-				output.flavor = i;
-		
-				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
-				output._id = new BSON.ObjectID();
-
-				// Only send message to clients listening on this flavor
-				utility.update_status("Instagram id " + output.id  + " sent out out to clients");	
-				io.sockets.in(i).emit('instagram',output);
-
-				// If want to use Arduino, flash lights on Arduino based on first matched attribute
-				// For now, the "flash bulb" effect is hard coded into program
-				if (config.flavors[i].arduino_ip) {
-					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-					arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, "FFFFFF", "000000", 2);	
-				}			
+			var output = {};
+			output.content = ig_posts[i];
+			output.id = ig_posts[i].id;
+			output.type = "instagram";
+			output.match = match_type;
+			output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
+			output.unixtime = ig_posts[i].created_time;
 	
-				// Save Instagram to database
-				save_instagram_to_db(config, output);
 
+			// Add the flavor to the message
+			output.flavor = i;
 
+			// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
+			output._id = new BSON.ObjectID();
 
+			// Only send message to clients listening on this flavor
+			utility.update_status("Instagram id " + output.id  + " sent out out to clients");	
+			io.sockets.in(i).emit('instagram',output);
+
+			// If want to use Arduino, flash lights on Arduino based on first matched attribute
+			// For now, the "flash bulb" effect is hard coded into program
+			if (config.flavors[i].arduino_ip) {
+				var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
+				arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, "FFFFFF", "000000", 2);	
+			}			
+
+			// Save Instagram to database
+			save_instagram_to_db(config, output);
+		});
+			
+	} // End looping through the flavors
 
 }
 
 
 
 
-
+/*
 var delete_all_instagram_subscriptions = function(config) {
 
 
@@ -356,72 +324,50 @@ var delete_all_instagram_subscriptions = function(config) {
 	req.end();
 	
 }
-
+*/
 
 
 // Initialize instagram subscriptions
-var intial_instagram_subscriptions = function(config) {
+var intialize_subscriptions = function(config, callback) {
+
+	console.log(config.Instagram.instagram_client_id + "\n" + config.Instagram.instagram_client_secret);
 
 	Instagram.set('client_id', config.Instagram.instagram_client_id);
 	Instagram.set('client_secret', config.Instagram.instagram_client_secret);
-	Instagram.set('callback_url', "http://swatsocial.swarthmore.edu:8000/instagram_subscription");
+	//Instagram.set('callback_url', "http://swatsocial.swarthmore.edu:8000/instagram_subscription");
+	Instagram.set('callback_url', "http://23.23.177.220:8008/instagram_subscription");
+
+	console.log(Instagram.subscriptions.list());
+
+	//Instagram.subscriptions.unsubscribe_all();
 
 	for (var i in config.instagram_tags) {
-		Instagram.tags.subscribe({ object_id: config.instagram_tags[i] });	
+		Instagram.tags.subscribe({ 
+			object_id: config.instagram_tags[i],
+			complete: function(data, pagination){
+      			// data is a javascript object/array/null matching that shipped Instagram
+      			// when available (mostly /recent), pagination is a javascript object with the pagination information
+      			console.log("Results of subscription request: ");
+      			console.log(data);
+    		},
+		  	error: function(errorMessage, errorObject, caller){
+			  	// errorMessage is the raised error message
+			  	// errorObject is either the object that caused the issue, or the nearest neighbor
+			  	// caller is the method in which the error occurred
+			  	console.log("Error requesting subscription: " + errorMessage);
+			}
+			
+		});	
 	}
 
  	for (var i in config.locations) {
 		Instagram.locations.subscribe({ object_id: config.locations[i] });	
 	}    
-     
-	Instagram.media.subscribe({ lat: 48.858844300000001, lng: 2.2943506, radius: 1000 });
-	
-	https.get(url, function(res) {
 
-	var data = "";
-	utility.update_status("Got Instagram response: " + res.statusCode);
-	
-	// Collect data as it is received from Instagram
-	res.on("data", function(chunk) {
-		data += chunk;
-	  });
+	// Hard code Swarthmore location for geography     
+	Instagram.media.subscribe({ lat: 39.9053898, lng: -75.3538015, radius: 500 });
 
-	// When Instagram request is done, acknowledge it
-	res.on("end", function() { 
-		
-		if (res.statusCode ==  200) { 
-			// Successfully received message from Instagram
-			var ig_data = JSON.parse(data);		// Convert to JSON
-			var ig_posts = ig_data.data;
-			
-			// Loop through all the posts, processing each one
-			for (var i=ig_posts.length-1; i>=0; i=i-1) {
-				process_Instagram_post(config, posts[i], match_type);			
-			} /
-		
-		} else {
-		
-			// Problem with getting data from Instagram -- try again after a short wait
-			console.log("Non-200 status when retrieving Instagram posts.  Trying again shortly.  Retry count is: " + count );
-			setTimeout( function(){ 
-					get_Instagram_posts(config, url, match_type, count+1);
-				}
-				,3000);			
-		}
-	});	
-	// End of handling Instagram posts
-
-
-	}).on('error', function(e) {
-		utility.update_status("Got Instagram error: " + e.message);
-	});	
-
-
-}
-
-
-
-
+	callback(null,config);
 
 }
 
@@ -450,3 +396,5 @@ var save_instagram_to_db = function(config, output) {
 
 
 exports.instagram_handler = instagram_handler;
+exports.intialize_subscriptions = intialize_subscriptions;
+exports.load_Instagram_search_terms = load_Instagram_search_terms;
