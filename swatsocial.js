@@ -15,7 +15,9 @@ var http = require('http'),
   	swat_instagram = require("./swat_instagram"),
   	mongo = require('mongodb'),
   	format = require('util').format,
-  	utility = require("./utility");
+  	utility = require("./utility"),
+  	arduino = require("./swat_arduino"),
+  	GoogleSpreadsheet = require("google-spreadsheet");
 
 var twit;
 var config;
@@ -42,7 +44,23 @@ function load_config() {
 		function(callback) {
 			connect_to_db(config, callback);
 		},
-			
+				
+		function(callback) {
+			load_flavors(config, callback);
+		},	
+				
+		function(callback) {
+			arduino.arduino_setup(config, callback);
+		},			
+		
+		function(callback) {
+			swat_instagram.load_Instagram_search_terms(config, callback);
+		},
+		
+		function(callback) {
+			swat_instagram.intialize_subscriptions(config, callback);
+		},
+		
 		function(callback) {
 			swat_tweet.connect_to_twitter(config, callback);
 		},
@@ -72,6 +90,41 @@ function load_config_file(config_file, callback) {
 	});
 }
 
+
+
+var load_flavors = function(config, callback) {
+
+	config.flavors = [];
+
+	utility.update_status("Connecting to Google Doc for flavor information");
+	var socialmedia_spreadsheet = new GoogleSpreadsheet(config.GoogleDoc.document_key);
+	
+	socialmedia_spreadsheet.getInfo( function( err, sheet_info ){
+
+		if (err) {
+			console.log("Error opening Google spreadsheet: " + err);
+			callback(err, config);
+			return;
+		}
+	
+		utility.update_status(sheet_info.title + ' is loaded' );
+	
+		// Loop through each config sheet, pulling out the configuration information	
+		for (var sheet in sheet_info.worksheets) {
+	
+			// Skip the template sheet
+			if ( sheet_info.worksheets[sheet].title != "TEMPLATE") {
+				// Add the flavor to the config
+				config.flavors[sheet_info.worksheets[sheet].title] = {};
+			}
+		}	
+		
+		callback(err, config);
+	});
+}
+
+
+
 function start_server(config_file, callback) {
 	fileServer = new static.Server('./public', { cache: 1 });
 	app.listen(config.app.port);
@@ -84,7 +137,7 @@ function start_server(config_file, callback) {
 function connect_to_db(config, callback) {
 
 	utility.update_status("Connecting to database");
-	MongoClient.connect('mongodb://127.0.0.1:27017/swatsocial', function(err, db) {
+	MongoClient.connect("mongodb://" + config.DB.db_host + ":27017/swatsocial", function(err, db) {
 		if(err) {utility.update_status("Can't connect to database: " + err);}
 
 		config.db = db;
@@ -102,6 +155,7 @@ function handler (request, response) {
 	var data = "";
 	
 	if (request.method == "GET") {
+		
 		if (request.url.indexOf("/instagram_subscription") == 0) {
 	
 			// If this is an instagram callback, just send back the hub challenge
@@ -114,7 +168,14 @@ function handler (request, response) {
 				response.end();
 			}
 			
+		} else if (_und.keys(config.flavors).indexOf(  url.parse(request.url).pathname.substring(1) ) > -1  ) {
+			// The URL requested (minus the initial slash) is one of the flavors -- serve up the index page
+			utility.update_status("Requested flavor: " + url.parse(request.url).pathname.substring(1));
+			request.url = "/"
+			fileServer.serve(request, response);
+	
 		} else {
+			// Not a special request, so serve up the file
 			fileServer.serve(request, response);
 		}
 		
@@ -161,16 +222,29 @@ io.sockets.on('connection', function(socket) {
 
 	utility.update_status("Got a socket connection");
 		
-	// Send last posts to client
-	last_posts(10, function(post) {
-		socket.emit(post.type, post);
-	});
+
+	
+	// Use the flavor to set the "room" to join
+	socket.on('flavor', function(flavor) {
+		// Check to see if flavor is in an existing room. If not, use the default room
+		 if (_und.keys(config.flavors).indexOf(flavor) == -1 ) {
+		 	flavor = "default";
+		 }
+        socket.join(flavor);
+        utility.update_status("New client joined flavor " + flavor);
+        
+       	// Send last posts to client
+		last_posts(10, flavor, function(post) {
+			socket.emit(post.type, post);
+		}); 
+        
+    });
 	
 		
 	socket.on('load_history', function (data) {
 		utility.update_status("Client requested history");
 			// Send last posts to client
-			last_posts(10, function(post) {
+			last_posts(10, data.flavor, function(post) {
 				socket.emit(post.type, post);	
 			});
 	});		
@@ -178,7 +252,7 @@ io.sockets.on('connection', function(socket) {
 	socket.on('load_previous_posts', function (data) {
 		utility.update_status("Client requested " + data.limit + " previous posts, starting from " + data.id);
 			// Send previous posts to client
-			previous_posts(data, function(post) {
+			previous_posts(data, data.flavor, function(post) {
 				post.type += "_previous";
 				socket.emit(post.type, post);	
 			});
@@ -197,10 +271,10 @@ io.sockets.on('connection', function(socket) {
 
 
 // Get the last n posts
-function last_posts(n, callback) {
+function last_posts(n, f, callback) {
 
-	utility.update_status("Retrieving last " + n + " posts");
-	config.db.collection('posts').find({}).sort({unixtime:-1}).limit(n).toArray(
+	utility.update_status("Retrieving last " + n + " posts for flavor " + f);
+	config.db.collection('posts').find({flavor:f}).sort({unixtime:-1}).limit(n).toArray(
 	function(err, docs) {
 		docs.reverse(); // Want most recent sent last
 		docs.forEach(function(doc) {
@@ -214,11 +288,11 @@ function last_posts(n, callback) {
 
 
 // Get the last n posts
-function previous_posts(data, callback) {
+function previous_posts(data, f, callback) {
 
 	utility.update_status("Retrieving " + data.limit + " posts, starting at post ID "  + data.id);
 	var o_id = new BSON.ObjectID(data.id);
-	config.db.collection('posts').find({ _id: { $lt: o_id } }).sort({unixtime:-1}).limit(data.limit).toArray(
+	config.db.collection('posts').find({ _id: { $lt: o_id }, flavor:f}).sort({unixtime:-1}).limit(data.limit).toArray(
 	function(err, docs) {
 		docs.forEach(function(doc) {
 			callback(doc);
