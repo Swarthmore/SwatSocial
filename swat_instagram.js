@@ -2,8 +2,10 @@ var arduino = require("./swat_arduino");
 	https = require('https'),
 	utility = require("./utility"),	
 	mongo = require('mongodb'),
-	GoogleSpreadsheet = require("google-spreadsheet");
-	
+	GoogleSpreadsheet = require("google-spreadsheet"),
+	Instagram = require('instagram-node-lib');
+
+
 var BSON = mongo.BSONPure;	
 
 
@@ -340,6 +342,10 @@ var delete_all_instagram_subscriptions = function(config) {
 
 	res.on('data', function (chunk) {
 		console.log('BODY: ' + chunk);
+		
+		// Now that all the old subscriptions are deleted, initialize new subscriptions
+		init_subscriptions(config);
+		
 	});
 
 	req.on('error', function(e) {
@@ -353,6 +359,71 @@ var delete_all_instagram_subscriptions = function(config) {
 
 
 
+// Initialize instagram subscriptions
+var intial_instagram_subscriptions = function(config) {
+
+	Instagram.set('client_id', config.Instagram.instagram_client_id);
+	Instagram.set('client_secret', config.Instagram.instagram_client_secret);
+	Instagram.set('callback_url', "http://swatsocial.swarthmore.edu:8000/instagram_subscription");
+
+	for (var i in config.instagram_tags) {
+		Instagram.tags.subscribe({ object_id: config.instagram_tags[i] });	
+	}
+
+ 	for (var i in config.locations) {
+		Instagram.locations.subscribe({ object_id: config.locations[i] });	
+	}    
+     
+	Instagram.media.subscribe({ lat: 48.858844300000001, lng: 2.2943506, radius: 1000 });
+	
+	https.get(url, function(res) {
+
+	var data = "";
+	utility.update_status("Got Instagram response: " + res.statusCode);
+	
+	// Collect data as it is received from Instagram
+	res.on("data", function(chunk) {
+		data += chunk;
+	  });
+
+	// When Instagram request is done, acknowledge it
+	res.on("end", function() { 
+		
+		if (res.statusCode ==  200) { 
+			// Successfully received message from Instagram
+			var ig_data = JSON.parse(data);		// Convert to JSON
+			var ig_posts = ig_data.data;
+			
+			// Loop through all the posts, processing each one
+			for (var i=ig_posts.length-1; i>=0; i=i-1) {
+				process_Instagram_post(config, posts[i], match_type);			
+			} /
+		
+		} else {
+		
+			// Problem with getting data from Instagram -- try again after a short wait
+			console.log("Non-200 status when retrieving Instagram posts.  Trying again shortly.  Retry count is: " + count );
+			setTimeout( function(){ 
+					get_Instagram_posts(config, url, match_type, count+1);
+				}
+				,3000);			
+		}
+	});	
+	// End of handling Instagram posts
+
+
+	}).on('error', function(e) {
+		utility.update_status("Got Instagram error: " + e.message);
+	});	
+
+
+}
+
+
+
+
+
+}
 
 
 
