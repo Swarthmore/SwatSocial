@@ -46,6 +46,10 @@ function load_config() {
 		},
 				
 		function(callback) {
+			start_server(config, callback);
+		},					
+				
+		function(callback) {
 			load_flavors(config, callback);
 		},	
 				
@@ -71,11 +75,7 @@ function load_config() {
 	
 		function(callback) {
 			swat_tweet.start_tracking_Twitter_terms(config, callback);
-		},
-		
-		function(callback) {
-			start_server(config, callback);
-		}	
+		}
 
 	]);
 }	
@@ -125,7 +125,7 @@ var load_flavors = function(config, callback) {
 
 
 
-function start_server(config_file, callback) {
+function start_server(config, callback) {
 	fileServer = new static.Server('./public', { cache: 1 });
 	app.listen(config.app.port);
 	utility.update_status("Started server");
@@ -156,7 +156,7 @@ function handler (request, response) {
 	
 	if (request.method == "GET") {
 		
-		if (request.url.indexOf("/instagram_subscription") == 0) {
+		if (request.url.indexOf(config.Instagram.instagram_callback_path) == 0) {
 	
 			// If this is an instagram callback, just send back the hub challenge
 			var url_parts = url.parse(request.url, true);
@@ -182,7 +182,7 @@ function handler (request, response) {
 	} else if (request.method == "POST") {
 	
 		// Is this an Instagram post?  If so, collect the data
-		if (request.url.indexOf("/instagram_subscription") == 0) {
+		if (request.url.indexOf(config.Instagram.instagram_callback_path) == 0) {
 		
 			// Save POST data as it arrives
 			request.on("data", function(chunk) {

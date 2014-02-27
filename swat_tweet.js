@@ -1,7 +1,9 @@
 var arduino = require("./swat_arduino"),
 	utility = require("./utility"),
 	mongo = require('mongodb'),
-	GoogleSpreadsheet = require("google-spreadsheet");
+	GoogleSpreadsheet = require("google-spreadsheet"),
+	und = require("underscore"),
+	util = require("util");
 	
 var BSON = mongo.BSONPure;	
 
@@ -183,9 +185,9 @@ function getTwitterTermsFromRow(config, flavor, row) {
 var start_tracking_Twitter_terms = function(config, callback) {
 
 	utility.update_status("Setting up tracking terms for Twitter.");
-	console.log(config.twitter_tracking_terms.join(','));
-	console.log(config.twitter_follow_ids.join(','));
-	console.log(config.flavors);
+	//console.log(config.twitter_tracking_terms.join(','));
+	//console.log(config.twitter_follow_ids.join(','));
+	console.log(util.inspect(config.flavors, { showHidden: true, depth: null }));
 
 	if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.destroy;} // Destroy any existing streams
 	twit.stream('statuses/filter', {
@@ -227,8 +229,7 @@ var tweet_handler = function(tweet, config) {
 			
 		// Loop through each flavor looking for matches
 		for (var i in config.flavors) {
-		
-			var output = {};
+			output = {}
 			output.content = tweet;
 			output.id = tweet.id;
 			output.type = "tweet";
@@ -247,7 +248,9 @@ var tweet_handler = function(tweet, config) {
 		
 			// Figure out which search term it matches
 			// Loop through all the terms set up in the Google Doc looking for a match
-			config.flavors[i].twitter_defs.every(function(r, index, array) {
+			for (var j = 0; j < config.flavors[i].twitter_defs.length; j++) {
+			
+				var r = config.flavors[i].twitter_defs[j]
 		
 				// Look for a user match
 				if (r.match_type == "user" && tweet.user.id == r.match) {
@@ -305,9 +308,7 @@ var tweet_handler = function(tweet, config) {
 					}				
 					output.matches.push(match);							
 				}		
-			
-				return true;	
-			}); // End of loop through Twitter search terms, users definitions, and URLs
+			} // End of loop through Twitter search terms, users definitions, and URLs
 			
 			
 			
@@ -331,6 +332,9 @@ var tweet_handler = function(tweet, config) {
 			
 			// Did we find a match?  If so, send it to the listeners
 			if (output.matches.length > 0) {
+			
+				// Remove any duplicate matches
+				output.matches = und.uniq(output.matches, function(item){return JSON.stringify(item);})
 			
 				// First replace any URLs in the text with links to the URL
 				output.content.entities.urls.forEach(function(element, index, array) {
