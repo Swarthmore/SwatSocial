@@ -3,7 +3,8 @@ var arduino = require("./swat_arduino"),
 	mongo = require('mongodb'),
 	GoogleSpreadsheet = require("google-spreadsheet"),
 	und = require("underscore"),
-	util = require("util");
+	util = require("util"),
+	async =  require("async");
 	
 var BSON = mongo.BSONPure;	
 
@@ -15,6 +16,12 @@ var connect_to_twitter = function (config, callback) {
 		access_token_key: config.Twitter.twitter_access_token,
 		access_token_secret: config.Twitter.twitter_access_token_secret
 	});   
+
+	// Set up a queue to save the Tweets to make sure they are saved sequentially
+	config.Twitter.db_save_queue = async.queue(function (task, callback) {
+		save_tweet(task.config, task.output, task.flavor);
+    	callback();
+	}, 1);
 
 	callback(err, twit);
 }
@@ -358,18 +365,9 @@ var tweet_handler = function(tweet, config) {
 				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
 				output._id = new BSON.ObjectID();
 
-				// Only send message to clients listening on this flavor
-				utility.update_status("Tweet send out");	
-				io.sockets.in(i).emit('tweet',output);
-	
-				// If want to use Arduino, flash lights on Arduino based on first matched attribute
-				if (config.flavors[i].arduino_ip) {
-					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-					arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
-				}			
-			
-				// Save Tweet to database
-				save_tweet(config, output);
+
+				// Save Tweet to database.  Use the callback to sent message on success to avoid problems with duplicates, etc
+				config.Twitter.db_save_queue.push({config: config, output: output, flavor: i})
 						
 			} else {
 			
@@ -394,7 +392,7 @@ var tweet_handler = function(tweet, config) {
 
 
 // Save Tweet to database.
-var save_tweet = function(config, output) {
+var save_tweet = function(config, output, flavor, callback) {
 	
 	utility.update_status("Saving Tweet '_id':" +  output._id);
 	
@@ -402,7 +400,17 @@ var save_tweet = function(config, output) {
 		  if (err){
 			  utility.update_status("Error trying to save Tweet ID " + output.id + " to the database for flavor " + output.flavor + "\n" + err);  
 		  } else {
-			  utility.update_status("Saved Tweet ID " + output.id + " to the database for flavor " + output.flavor);
+			utility.update_status("Saved Tweet ID " + output.id + " to the database for flavor " + output.flavor);
+			  
+			// Only send message to clients listening on this flavor
+			utility.update_status("Tweet send out");	
+			io.sockets.in(flavor).emit('tweet',output);
+
+			// If want to use Arduino, flash lights on Arduino based on first matched attribute
+			if (config.flavors[flavor].arduino_ip) {
+				var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
+				arduino.send_arduino_message(config.flavors[flavor].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
+			}			
 		  }
 	});	
 

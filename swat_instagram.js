@@ -42,7 +42,7 @@ var load_Instagram_search_terms = function(config, callback) {
 			function(err){
 							
 				// Master list of Instagram search parameters	
-				// Loop over the flavors, pulling out the Twitter search terms and follow ids
+				// Loop over the flavors, pulling out the Instagram tags and locations
 				for (var key in config.flavors) {
 					config.instagram_tags = config.instagram_tags.concat(config.flavors[key].instagram_tags);
 					config.instagram_locations = config.instagram_locations.concat(config.flavors[key].instagram_locations);
@@ -396,8 +396,16 @@ var intialize_subscriptions = function(config, callback) {
 		
 			// Subscribe to all feeds
 			for (var i in config.instagram_tags) {
+				
+				// Strip off hashtag or @ symbols
+				var tag = config.instagram_tags[i];
+				if (tag.charAt(0) == "@" || tag.charAt(0) == "#") {
+					tag = tag.substr(1);
+				}
+			
+			
 				Instagram.tags.subscribe({ 
-					object_id: config.instagram_tags[i],
+					object_id: tag,
 					complete: function(data, pagination){
 						// data is a javascript object/array/null matching that shipped Instagram
 						// when available (mostly /recent), pagination is a javascript object with the pagination information

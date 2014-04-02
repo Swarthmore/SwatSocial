@@ -118,7 +118,7 @@ $(document).ready(function() {
 
 	function start_ws() {
 
-		socket = io.connect('',{
+		socket = io.connect('http://swatsocial.swarthmore.edu',{
 			'reconnect': true,
   			'reconnection delay': 500,
   			'max reconnection attempts': Infinity
