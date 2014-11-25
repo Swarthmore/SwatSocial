@@ -10,10 +10,10 @@ var BSON = mongo.BSONPure;
 
 var connect_to_twitter = function (config, callback) {
 	var err;	
-	twit = new twitter({
+	twit = new Twit({
 		consumer_key: config.Twitter.twitter_consumer_key,
 		consumer_secret: config.Twitter.twitter_consumer_secret,
-		access_token_key: config.Twitter.twitter_access_token,
+		access_token: config.Twitter.twitter_access_token,
 		access_token_secret: config.Twitter.twitter_access_token_secret
 	});   
 
@@ -25,13 +25,6 @@ var connect_to_twitter = function (config, callback) {
 
 	callback(err, twit);
 }
-
-
-
-
-
-
-
 
 
 
@@ -196,22 +189,35 @@ var start_tracking_Twitter_terms = function(config, callback) {
 	//console.log(config.twitter_follow_ids.join(','));
 	console.log(util.inspect(config.flavors, { showHidden: true, depth: null }));
 
-	if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.destroy;} // Destroy any existing streams
-	twit.stream('statuses/filter', {
+	//if (typeof twit.stream != undefined  && twit.stream !== null) {twit.stream.stop();} // Destroy any existing streams
+	
+	config.twitter_stream = twit.stream('statuses/filter', {
 			'track':config.twitter_tracking_terms.join(','), 
 			'locations':'-75.359216,39.898439,-75.350075,39.909144',
 			'follow': config.twitter_follow_ids.join(',')
-			},
+	});
+
 			
-		function(stream) {
+	config.twitter_stream.on('error', function(error, code) {
+		utility.update_status("Error setting up Twitter stream: " + error + ": " + code);
+	});
 		
-			stream.on('error', function(error, code) {
-				utility.update_status("Error setting up Twitter stream: " + error + ": " + code);
-			});
-		
-      		stream.on('data', function(data) {tweet_handler(data, config);});
-       	}
-    );
+	config.twitter_stream.on('tweet', function(data) {tweet_handler(data, config);});
+      		
+	config.twitter_stream.on('connect', function (request) {
+		utility.update_status("Connected to Twitter: " + request);
+	});
+	
+	config.twitter_stream.on('warning', function (warning) {
+		utility.update_status("Twitter warning: " + warning);
+	});
+	
+	
+	config.twitter_stream.on('disconnect', function (disconnectMessage) {
+		utility.update_status("Disconnected from Twitter stram: " + disconnectMessage);
+		connect_to_twitter(config);	// Attempt to reconnect
+	});
+
     
     callback(null,config);
 
