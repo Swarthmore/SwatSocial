@@ -403,6 +403,7 @@ var intialize_subscriptions = function(config, callback) {
 					tag = tag.substr(1);
 				}
 			
+				console.log("Subscribing to Instagram tag: " + tag);
 			
 				Instagram.tags.subscribe({ 
 					object_id: tag,
@@ -416,7 +417,7 @@ var intialize_subscriptions = function(config, callback) {
 						// errorMessage is the raised error message
 						// errorObject is either the object that caused the issue, or the nearest neighbor
 						// caller is the method in which the error occurred
-						console.log("Error requesting subscription: " + errorMessage);
+						console.log("Error requesting subscription for " + tag + ": " + errorMessage);
 					}
 			
 				});	

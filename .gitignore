@@ -1,3 +1,5 @@
 .DS_Store
 nohup.out
 *.conf
+*.log
+node_modules

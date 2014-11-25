@@ -119,9 +119,9 @@ $(document).ready(function() {
 	function start_ws() {
 
 		socket = io.connect('http://swatsocial.swarthmore.edu',{
-			'reconnect': true,
-  			'reconnection delay': 500,
-  			'max reconnection attempts': Infinity
+			//'reconnect': true,
+  			//'reconnection delay': 500,
+  			//'max reconnection attempts': Infinity
 		});
 		var socketTimer;
 		var ws_heartbeat_interval = 60000;		// Websocket heartbeat (to keep connection open)
