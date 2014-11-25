@@ -12,11 +12,11 @@ var BSON = mongo.BSONPure;
 
 var connect_to_tumblr = function (config, callback) {
 	var err;	
-	tumblr = = tumblr.createClient({
-	  consumer_key: config.tumblr.tumblr_consumer_key,
-	  consumer_secret: config.tumblr.tumblr_consumer_secret,
-	  token: config.tumblr.tumblr_token,
-	  token_secret: config.tumblr.tumblr_token_secret,
+	config.tumblrClient = tumblr.createClient({
+	  consumer_key: config.Tumblr.tumblr_consumer_key,
+	  consumer_secret: config.Tumblr.tumblr_consumer_secret,
+	  token: config.Tumblr.tumblr_token,
+	  token_secret: config.Tumblr.tumblr_token_secret,
 	});
 
 	callback(err, tumblr);
@@ -90,8 +90,8 @@ function process_google_sheet(config, flavor, spreadsheet, callback) {
 
 	spreadsheet.getRows(0, function(err, row_data){
 
-		// Add term to Tumblr tag list.  If the term starts with @ or #, drop it.
-		for (var i in row_data) {
+		// Add term to Tumblr tag list.  
+		for (var row in row_data) {
 			if (row.tumblrtags) {
 				config.flavors[flavor].tumblr_tags.push(row.tumblrtags);
 				utility.update_status("Found a Tumblr tag: " + row.tumblrtags);
@@ -115,12 +115,12 @@ function process_google_sheet(config, flavor, spreadsheet, callback) {
 
 
 // Check to see if there is a new Tumblr post matching a tag 
-var check_tumblr_tags = function(config, callback) {
+var check_tumblr_tags = function(config) {
 
 	utility.update_status("Looking for Tumblr posts");
 
 	var tag = "todossomosayotzinapa"
-	client.tagged(tag, function(err, response) {
+	config.tumblrClient.tagged(tag, function(err, response) {
 
 		if (err) {
 			utility.update_status("Could not search Tumblr term: " + tag + ": " + err);
@@ -176,133 +176,67 @@ var tumblr_handler = function(post, config) {
 				if (tag_index != -1) {
 					utility.update_status("Found Tumblr tag: " + tag);
 					output.matches.push(tag);
-				} // End of checking for a tag
+				} // End of checking for a tag									
+			});
 			
 			
-					// See if there is a search term match in a URL
-				if (r["type"]="term" && typeof tweet.entities.urls != 'undefined' && tweet.entities.urls !== null && _und.pluck(tweet.entities.urls, 'expanded_url').join(" ").indexOf(r.match) != -1) {
-								
-					utility.update_status("Matched search term " + r.match + " in URL:");
-					utility.update_status(tweet.entities.urls);
-						
-					var url_match = _und.pluck(tweet.entities.urls, 'expanded_url').join();		
-						
-					var match = {
-						matchtype: "URL",
-						match: url_match,
-						color1:  r.color1,
-						color2:  r.color2,
-						display_mode: r.displaymode
-					}				
-					output.matches.push(match);							
-				}		
-			
-				return true;	
-			}); // End of loop through Twitter search terms, users definitions, and URLs
-			
-			
-			
-			// See it if matched our location (only if geolocated is selected)
-			if (config.flavors[i].twitter_geo && typeof tweet.coordinates!='undefined' && tweet.coordinates !== null && tweet.coordinates.coordinates[0] <= -75.350075 &&  tweet.coordinates.coordinates[0] >=-75.359216 &&  tweet.coordinates.coordinates[1] >= 39.898439 &&  tweet.coordinates.coordinates[1] <= 39.909144) {
-		
-				utility.update_status("Matched location: " + tweet.coordinates.coordinates);
-					
-				var match = {
-					matchtype: "Location",
-					match: tweet.coordinates.coordinates.reverse().join(), 	// Lat and lon are reversed in Tweeter feeds
-					color1:  "FF0000",
-					color2:  "A00000",
-					display_mode: "party_mode"
-				}				
-				output.matches.push(match);
-			}					
-			
-				
+			// Add the flavor to the message
+			output.flavor = i;
 
+			// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
+			output._id = new BSON.ObjectID();
+
+			// Only send message to clients listening on this flavor
+			utility.update_status("Tumblr id " + output.id  + " sent out out to clients");	
+			io.sockets.in(i).emit('tumblr',output);
+
+			// If want to use Arduino, flash lights on Arduino 
+			// For now, the "flash bulb" effect is hard coded into program
+			if (config.flavors[i].arduino_ip) {
+				arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, "0000FF", "000000", 2);	
+			}			
+
+			// Save Tumblr post to database
+			save_tumblr_to_db(config, output);
 			
-			// Did we find a match?  If so, send it to the listeners
-			if (output.matches.length > 0) {
-			
-				// First replace any URLs in the text with links to the URL
-				output.content.entities.urls.forEach(function(element, index, array) {
-					utility.update_status("Found a URL: " + element.url);
-					output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");
-				});
-			
+	} // End looping through the flavors
+
+}
+
+
+
+
+
+// Save Tumblr post to database.
+var save_tumblr_to_db = function(config, output) {
 	
-				// Then replace any media links in the text 
-				// Loop through all the media entities and replace text with actual link
-				if (typeof output.content.entities.media != 'undefined') {
-					output.content.entities.media.forEach(function(element, index, array) {
-						output.content.text = output.content.text.replace(element.url, "<a href=\"" + element.expanded_url + "\" target=\"_blank\">" + element.display_url + "</a>");			
-					});
-				}
-	
-				
-				// Add the flavor to the message
-				output.flavor = i;
-				
-				// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
-				output._id = new BSON.ObjectID();
-
-				// Only send message to clients listening on this flavor
-				utility.update_status("Tweet send out");	
-				io.sockets.in(i).emit('tweet',output);
-	
-				// If want to use Arduino, flash lights on Arduino based on first matched attribute
-				if (config.flavors[i].arduino_ip) {
-					var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-					arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, output.matches[0].color1, output.matches[0].color2, display);	
-				}			
-			
-				// Save Tweet to database
-				save_tweet(config, output);
-						
-			} else {
-			
-				// Tweet did not match any terms, users, URL, locations, etc.  Don't send out or save.
-				
-				utility.update_status("Did not match anything -- not displaying");
-			
-				// Print out a note if this is probably due to location
-				if (typeof tweet.place!='undefined' && tweet.place !== null &&
-					(tweet.place.name == "New Jersey" || tweet.place.name == "Pennsylvania" || tweet.place.full_name.indexOf(", PA") != -1)) {
-					utility.update_status("Probably because place is PA or NJ");
-				} 
-			}
-			
-		} // End of looping through the flavors
-
-} // End of tweet_handler
-
-
-
-
-
-
-// Save Tweet to database.
-var save_tweet = function(config, output) {
-	
-	utility.update_status("Saving Tweet '_id':" +  output._id);
+	utility.update_status("Saving Tumblr '_id':" +  output._id);
 	
 	var _id = config.db.collection('posts').insert(output, function(err, object) {
 		  if (err){
-			  utility.update_status("Error trying to save Tweet ID " + output.id + " to the database for flavor " + output.flavor + "\n" + err);  
+			  utility.update_status("Error trying to save Tumblr ID " + output.id + " to the database for flavor " + output.flavor + "\n" + err);  
 		  } else {
-			  utility.update_status("Saved Tweet ID " + output.id + " to the database for flavor " + output.flavor);
+			  utility.update_status("Saved Tumblr ID " + output.id + " to the database for flavor " + output.flavor);
 		  }
 	});	
 
 
-} // End of save_tweet
+} // End of save_tumblr_to_db
 
 
 
 
 
+var start_listening_to_tumblr = function(config, callback) {
+	// Check Tumblr on a set interval
+	setInterval(check_tumblr_tags(config), config.Tumblr.tumblr_check_time*100);
+	callback();
+}
 
 
-exports.connect_to_twitter = connect_to_twitter;
-exports.load_Twitter_search_terms = load_Twitter_search_terms;
-exports.start_tracking_Twitter_terms = start_tracking_Twitter_terms;
-exports.tweet_handler = tweet_handler;
+
+
+exports.connect_to_tumblr = connect_to_tumblr;
+exports.load_tumblr_search_terms = load_tumblr_search_terms;
+exports.check_tumblr_tags = check_tumblr_tags;
+exports.start_listening_to_tumblr = start_listening_to_tumblr;

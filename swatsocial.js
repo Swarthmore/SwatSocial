@@ -13,6 +13,7 @@ var http = require('http'),
   	moment = require('moment'),
   	swat_tweet = require("./swat_tweet"),
   	swat_instagram = require("./swat_instagram"),
+  	swat_tumblr = require("./swat_tumblr"),
   	mongo = require('mongodb'),
   	format = require('util').format,
   	utility = require("./utility"),
@@ -37,6 +38,7 @@ load_config();
 
 function load_config() {
 	async.series([
+	
 		function(callback) {
 			load_config_file(CONFIG_FILE, callback);
 		}, 
@@ -52,6 +54,14 @@ function load_config() {
 		function(callback) {
 			arduino.arduino_setup(config, callback);
 		},			
+
+		function(callback) {
+			swat_tumblr.connect_to_tumblr(config, callback);
+		},
+	
+		function(callback) {
+			swat_tumblr.load_tumblr_search_terms(config, callback);
+		},
 		
 		function(callback) {
 			swat_instagram.load_Instagram_search_terms(config, callback);
@@ -72,6 +82,10 @@ function load_config() {
 		function(callback) {
 			swat_tweet.start_tracking_Twitter_terms(config, callback);
 		},
+		
+		function(callback) {
+			swat_tumblr.start_listening_to_tumblr(config, callback);
+		},	
 		
 		function(callback) {
 			start_server(config, callback);
