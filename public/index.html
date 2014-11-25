@@ -35,7 +35,9 @@ var socket;
 
 // Set up the flavor based on the URL
 var flavor = window.location.pathname.substring(1);	// Get the path minus the initial slash
-			
+if (flavor == "") {
+	flavor="default";
+}			
 
 $(document).ready(function() {
 	start_ws();		// Start web sockets	
@@ -116,7 +118,7 @@ $(document).ready(function() {
 
 	function start_ws() {
 
-		socket = io.connect('',{
+		socket = io.connect('http://swatsocial.swarthmore.edu',{
 			'reconnect': true,
   			'reconnection delay': 500,
   			'max reconnection attempts': Infinity

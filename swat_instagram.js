@@ -3,7 +3,8 @@ var arduino = require("./swat_arduino");
 	utility = require("./utility"),	
 	mongo = require('mongodb'),
 	GoogleSpreadsheet = require("google-spreadsheet"),
-	Instagram = require('instagram-node-lib');
+	Instagram = require('instagram-node-lib'),
+	_und = require("underscore");
 
 
 var BSON = mongo.BSONPure;	
@@ -41,7 +42,7 @@ var load_Instagram_search_terms = function(config, callback) {
 			function(err){
 							
 				// Master list of Instagram search parameters	
-				// Loop over the flavors, pulling out the Twitter search terms and follow ids
+				// Loop over the flavors, pulling out the Instagram tags and locations
 				for (var key in config.flavors) {
 					config.instagram_tags = config.instagram_tags.concat(config.flavors[key].instagram_tags);
 					config.instagram_locations = config.instagram_locations.concat(config.flavors[key].instagram_locations);
@@ -136,38 +137,86 @@ function getInstagramTermsFromRow(config, flavor, row) {
 
 var instagram_handler = function(config, instagram_update) {
 
-	utility.update_status("Received an Instagram callback.  Now building the URL to retrieve the posts.");
+	utility.update_status("Received an Instagram callback.");
 	utility.update_status(instagram_update);
-	instagram_update.every(function(element, index, array) {
-		utility.update_status("Instagram update for " + element.object + ": " + element.object_id);
-		var ig_request_url;
-		config.Instagram.instagram_last_tag_id = 1;
-		config.Instagram.instagram_last_geography_id =1;
-		
-		switch (element.object) {
+	
+	// Loop through each Instagram match and get the updated information
+	//instagram_update.every(function(element, index, array) {
+	
+	for (var j in instagram_update) {
+	
+		utility.update_status("Instagram update for " + instagram_update[j].object + ": " + instagram_update[j].object_id);
+
+		// Depending on the match type, request the appropriate Instagram media		
+		switch (instagram_update[j].object) {
 		
 			case "tag":
-				// Download recent posts with matching tags
-				g_request_url = "https://api.instagram.com/v1/tags/" + element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; 
-				get_Instagram_posts(config, ig_request_url, {type:"tag", value:element.object_id});	
+
+				console.log("******* Now ask for recent \"" + instagram_update[j].object_id + "\" tags");
+
+				Instagram.tags.recent({ 			
+					name: instagram_update[j].object_id,			
+					complete: function(data, pagination){
+						utility.update_status("Received recent posts for Instagram tag " + instagram_update[j].object_id);
+						// Loop through each post, processing each match
+						for (var i=data.length-1; i>=0; i=i-1) {
+							process_Instagram_post(config, data[i], "tag");			
+						}	
+					},
+					error: function(errorMessage, errorObject, caller){
+						utility.update_status("Error retrieving Instagram tag " + instagram_update[j].object_id + "\n" + errorMessage);
+					}
+				});
+				
 				break;
 			
+			
 			case "location":
-				//Download recent posts with matching locations
-				ig_request_url = "https://api.instagram.com/v1/locations/" +  element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; // + "&min_id=" + tag_id;
-				get_Instagram_posts(config, ig_request_url, {type:"location", value:element.object_id});							
+			
+				Instagram.locations.recent({ 
+					location_id: instagram_update[j].object_id,		
+					complete: function(data, pagination){
+						// Loop through each post, processing each match
+						for (var i=data.length-1; i>=0; i=i-1) {
+							process_Instagram_post(config, data[i], "location");			
+						}	
+					},	
+					error: function(errorMessage, errorObject, caller){
+						utility.update_status("Error retrieving Instagram location " + instagram_update[j].object_id + "\n" + errorMessage);
+					}
+				});
+				break;
+				
+			case "user":
+			
+				Instagram.users.recent({ 
+					user_id: instagram_update[j].object_id,		
+					complete: function(data, pagination){
+						// Loop through each post, processing each match
+						for (var i=data.length-1; i>=0; i=i-1) {
+							process_Instagram_post(config, data[i], "user");			
+						}	
+					},	
+					error: function(errorMessage, errorObject, caller){
+						utility.update_status("Error retrieving Instagram user " + instagram_update[j].object_id + "\n" + errorMessage);
+					}
+				});
 				break;
 				
 			case "geography":
-				// Download recent posts with matching geographies	
-				ig_request_url = "https://api.instagram.com/v1/geographies/" +  element.object_id + "/media/recent?client_id=" + config.Instagram.instagram_client_id; // + "&min_id=" + tag_id;
-				get_Instagram_posts(config, ig_request_url, {type:"geography", value:element.object_id});				
-				break;	
-				
-			case "user":
-				// Download recent posts with matching user
-				ig_request_url = "https://api.instagram.com/v1/users/" +  element.object_id + "/media/recent?access_token=" + config.Instagram.instagram_access_token; // + "&min_tag_id=" + tag_id;
-				get_Instagram_posts(config, ig_request_url, {type:"user", value:element.object_id});							
+			
+				Instagram.geographies.recent({ 
+					geography_id: instagram_update[j].object_id,		
+					complete: function(data, pagination){
+						// Loop through each post, processing each match
+						for (var i=data.length-1; i>=0; i=i-1) {
+							process_Instagram_post(config, data[i], "geography");			
+						}	
+					},	
+					error: function(errorMessage, errorObject, caller){
+						utility.update_status("Error retrieving Instagram geography " + instagram_update[j].object_id + "\n" + errorMessage);
+					}
+				});
 				break;
 				
 			default:
@@ -175,65 +224,11 @@ var instagram_handler = function(config, instagram_update) {
 				utility.update_status("Can't find a matching Instagram type to return");
 			}	// End of switch on instagram subscription type
 		
-	});	// End of loop through each instagram subscription update
+	}	// End of loop through each instagram subscription update
 
 
 }
 
-
-
-// Request Instagram media
-// This can be called multiple times in case there is a problem with the connetion
-var get_Instagram_posts = function(config, url, match_type, count) {
-
-	// If count is not provided, make it zero
-	// If count is more than 3, give up
-	count = (typeof count === "undefined") ? 0 : count;
-	if (count > 3) {return;}
-
-	utility.update_status("Requesting Instagram update with: " + url);
-
-	https.get(url, function(res) {
-	
-		var data = "";
-		utility.update_status("Got Instagram response: " + res.statusCode);
-		
-		// Collect data as it is received from Instagram
-		res.on("data", function(chunk) {
-			data += chunk;
-		  });
-	
-		// When Instagram request is done, acknowledge it
-		res.on("end", function() { 
-			
-			if (res.statusCode ==  200) { 
-				// Successfully received message from Instagram
-				var ig_data = JSON.parse(data);		// Convert to JSON
-				var ig_posts = ig_data.data;
-				
-				// Loop through all the posts, processing each one
-				for (var i=ig_posts.length-1; i>=0; i=i-1) {
-					process_Instagram_post(config, posts[i], match_type);			
-				} 
-			
-			} else {
-			
-				// Problem with getting data from Instagram -- try again after a short wait
-				console.log("Non-200 status when retrieving Instagram posts.  Trying again shortly.  Retry count is: " + count );
-				setTimeout( function(){ 
-						get_Instagram_posts(config, url, match_type, count+1);
-					}
-					,3000);			
-			}
-		});	
-		// End of handling Instagram posts
-
-
-	}).on('error', function(e) {
-		utility.update_status("Got Instagram error: " + e.message);
-	});	
-}
-	
 
 
 
@@ -244,18 +239,63 @@ var process_Instagram_post = function(config, post, match_type) {
 		
 	// Loop through each flavor looking for matches
 	for (var i in config.flavors) {
-		
-		// Loop through all the terms set up in the Google Doc looking for a match
-		config.flavors[i].twitter_defs.every(function(r, index, array) {
 
-			var output = {};
-			output.content = ig_posts[i];
-			output.id = ig_posts[i].id;
-			output.type = "instagram";
-			output.match = match_type;
-			output.formatted_time = moment.unix(ig_posts[i].created_time).format("M/D/YYYY h:mm:ss A");
-			output.unixtime = ig_posts[i].created_time;
+		console.log("Checking instagram for flavor " + i);
+
+		var matches = [];
+
+
+		// First, check to see if this user is Blacklisted for this flavor.  If so, skip to next flavor.
+		if (config.flavors[i].instagram_blacklist.indexOf(post.user.username) > -1) {
+			next;
+		}
+
+		// Now check to see if this matches a tag of interest for this flavor
+		// See the caption text or tags match a search term
+		for (var j = 0; j < config.flavors[i].instagram_tags.length; j++) {
+
+			// Make sure tag to compare is lowercase
+			var tag = config.flavors[i].instagram_tags[j].toLowerCase();
+
+			console.log("Checking flavor \"" + i + "\" for tag \"" + tag + "\" in tag listing: \"" + post.tags.join(",") + "\"");
 	
+			// Strip off hashtag or @ symbols
+			if (tag.charAt(0) == "@" || tag.charAt(0) == "#") {
+				tag = tag.substr(1);
+			}
+	
+			// Look to see if term is in tag listing
+			if (post.tags.indexOf(tag) > -1) {
+				matches.push({type:'tag', 'value': config.flavors[i].instagram_tags[j]});
+			}
+		}
+
+			
+			
+		
+		
+		// Check to see if there are location matches		 	
+		 if (config.flavors[i].instagram_geo && post.location && post.location.name && config.flavors[i].instagram_locations.indexOf(post.location.name) > -1) {
+			matches.push({type:'location', 'value': post.location.name});
+		 }
+		
+		if (config.flavors[i].instagram_geo && match_type == "geography") {
+			matches.push({type:'geography'});
+		}
+				
+		// If this flavor matches the Instagram post, process it.  
+		if (matches.length > 0) {
+		
+			utility.update_status("Instagram post matches: " + matches.join() + " for flavor " + i); 
+			
+			var output = {};
+			output.content = post;
+			output.id = post.id;
+			output.type = "instagram";
+			output.match = matches;
+			output.formatted_time = moment.unix(post.created_time).format("M/D/YYYY h:mm:ss A");
+			output.unixtime = post.created_time;
+
 
 			// Add the flavor to the message
 			output.flavor = i;
@@ -263,20 +303,32 @@ var process_Instagram_post = function(config, post, match_type) {
 			// Generate a new object ID first so that we can send it to the browser without having to do a lookup after insert
 			output._id = new BSON.ObjectID();
 
-			// Only send message to clients listening on this flavor
-			utility.update_status("Instagram id " + output.id  + " sent out out to clients");	
-			io.sockets.in(i).emit('instagram',output);
+			// Save Instagram to database and send out
+			// (don't send out if the post has already been saved)
+			// Note: there is an index on id and flavor, so the insert will fail if a duplicate entry is made
+			config.db.collection('posts').insert(output, function(err, doc) {
+				if (err) {
+					utility.update_status("Could not save instagram post id " + output.id + " to database: " + err);
+				} else {
+					console.log("Saved IG to db: ");
+				
+					// Only send message to clients listening on this flavor
+					utility.update_status("Instagram id " + doc[0].id  + " sent out out to clients");	
+					io.sockets.in(doc[0].flavor).emit('instagram',doc[0]);
 
-			// If want to use Arduino, flash lights on Arduino based on first matched attribute
-			// For now, the "flash bulb" effect is hard coded into program
-			if (config.flavors[i].arduino_ip) {
-				var display = ( output.matches[0].displaymode == "pulse" ? 0 : 1);
-				arduino.send_arduino_message(config.flavors[i].arduino_ip, output.id, "FFFFFF", "000000", 2);	
-			}			
+					// If want to use Arduino, flash lights on Arduino based on first matched attribute
+					// For now, the "flash bulb" effect is hard coded into program
+					if (config.flavors[doc[0].flavor].arduino_ip) {
+						arduino.send_arduino_message(config.flavors[doc[0].flavor].arduino_ip, doc[0].id, "FFFFFF", "000000", "2");	
+					}			
 
-			// Save Instagram to database
-			save_instagram_to_db(config, output);
-		});
+				}
+			});
+			
+			
+		} else {
+			utility.update_status("Instagram post does not match anything for flavor " + i);
+		}
 			
 	} // End looping through the flavors
 
@@ -334,38 +386,55 @@ var intialize_subscriptions = function(config, callback) {
 
 	Instagram.set('client_id', config.Instagram.instagram_client_id);
 	Instagram.set('client_secret', config.Instagram.instagram_client_secret);
-	//Instagram.set('callback_url', "http://swatsocial.swarthmore.edu:8000/instagram_subscription");
-	Instagram.set('callback_url', "http://23.23.177.220:8008/instagram_subscription");
+	Instagram.set('callback_url', config.app.url +  config.Instagram.instagram_callback_path);
 
 	console.log(Instagram.subscriptions.list());
 
-	//Instagram.subscriptions.unsubscribe_all();
-
-	for (var i in config.instagram_tags) {
-		Instagram.tags.subscribe({ 
-			object_id: config.instagram_tags[i],
-			complete: function(data, pagination){
-      			// data is a javascript object/array/null matching that shipped Instagram
-      			// when available (mostly /recent), pagination is a javascript object with the pagination information
-      			console.log("Results of subscription request: ");
-      			console.log(data);
-    		},
-		  	error: function(errorMessage, errorObject, caller){
-			  	// errorMessage is the raised error message
-			  	// errorObject is either the object that caused the issue, or the nearest neighbor
-			  	// caller is the method in which the error occurred
-			  	console.log("Error requesting subscription: " + errorMessage);
-			}
+	Instagram.subscriptions.unsubscribe_all( {
+	
+		complete: function(data, pagination){
+		
+			// Subscribe to all feeds
+			for (var i in config.instagram_tags) {
+				
+				// Strip off hashtag or @ symbols
+				var tag = config.instagram_tags[i];
+				if (tag.charAt(0) == "@" || tag.charAt(0) == "#") {
+					tag = tag.substr(1);
+				}
 			
-		});	
-	}
+			
+				Instagram.tags.subscribe({ 
+					object_id: tag,
+					complete: function(data, pagination){
+						// data is a javascript object/array/null matching that shipped Instagram
+						// when available (mostly /recent), pagination is a javascript object with the pagination information
+						console.log("Results of subscription request: ");
+						console.log(data);
+					},
+					error: function(errorMessage, errorObject, caller){
+						// errorMessage is the raised error message
+						// errorObject is either the object that caused the issue, or the nearest neighbor
+						// caller is the method in which the error occurred
+						console.log("Error requesting subscription: " + errorMessage);
+					}
+			
+				});	
+			}
 
- 	for (var i in config.locations) {
-		Instagram.locations.subscribe({ object_id: config.locations[i] });	
-	}    
+			for (var i in config.locations) {
+				Instagram.locations.subscribe({ object_id: config.locations[i] });	
+			}    
 
-	// Hard code Swarthmore location for geography     
-	Instagram.media.subscribe({ lat: 39.9053898, lng: -75.3538015, radius: 500 });
+			// Hard code Swarthmore location for geography     
+			Instagram.media.subscribe({ lat: 39.9053898, lng: -75.3538015, radius: 500 });
+		
+		
+		} // End of unsubscribe all complete callback
+	
+	}); // End of unsubscribe all
+
+	
 
 	callback(null,config);
 

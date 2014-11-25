@@ -80,7 +80,7 @@ function process_google_sheet(config, flavor, spreadsheet, callback) {
 // Send Arduino message
 var send_arduino_message = function(arduino_ip, message_id, color1, color2, display_mode) {
 
-	arduino_url = arduino_ip + "?id=" + message_id + "&color1=" + color1 + "&color2=" + color2 + "&mode=" + display_mode
+	arduino_url = "http://" + arduino_ip + "?id=" + message_id + "&color1=" + color1 + "&color2=" + color2 + "&mode=" + display_mode
 	utility.update_status("Sending to Arduino: " + arduino_url);
 	http.get(arduino_url, function(res) {
 	  utility.update_status("Got Arduino response: " + res.statusCode);
